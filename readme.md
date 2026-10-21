@@ -6,8 +6,11 @@ to run backend
     1. cd Campus-AttendX
     2. node first.js
 
+<<<<<<< HEAD
 
 mja nhi aarha ek kam kro mane jo tujhe teeno dashboard ka work flow bheja h to mere project bilkul excect aisa hi dikhna chaiye don't depend on the backend update the backend anywhere required but i wants the my frontend flow exact same like the 3 dowcmunets i give you ADMIN DASHBOARD, STUDENT DASHBOARD, FACULYT DASBHBAORD 
 
 
 https://github.com/AmitChhoker/Campus-AttendX
+=======
+>>>>>>> 863efcf52082b335d04a2a317c96f5c8a390ed22
