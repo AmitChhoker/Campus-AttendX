@@ -1,7 +1,4 @@
-const studentSubjectsService = require(
-    "../../services/student/studentSubjects.service"
-);
-
+const studentSubjectsService = require("../../services/Student/studentSubjects.service");
 // =====================================================
 // 1. GET MY SUBJECTS
 // =====================================================
