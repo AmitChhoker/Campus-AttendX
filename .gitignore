@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.local
+
+# Google Drive Secrets
+credentials.json
+token.json
+
+# Builds & Logs
+dist/
+build/
+*.log
+.DS_Store

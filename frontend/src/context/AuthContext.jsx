@@ -1,0 +1,46 @@
+import { createContext, useContext, useEffect, useState } from "react";
+import client from "../api/client";
+
+const AuthCtx = createContext(null);
+export const useAuth = () => useContext(AuthCtx);
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = async () => {
+    try {
+      const res = await client.get("/auth/me");
+      setUser(res.data.user);
+      return res.data.user;
+    } catch {
+      setUser(null);
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    (async () => {
+      await refresh();
+      setLoading(false);
+    })();
+  }, []);
+
+  const login = async (emailId, password) => {
+    await client.post("/auth/login", { emailId, password });
+    return refresh();
+  };
+
+  const logout = async () => {
+    try {
+      await client.post("/auth/logout");
+    } catch {}
+    setUser(null);
+  };
+
+  return (
+    <AuthCtx.Provider value={{ user, loading, login, logout, refresh }}>
+      {children}
+    </AuthCtx.Provider>
+  );
+}
