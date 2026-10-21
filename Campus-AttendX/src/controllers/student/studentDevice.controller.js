@@ -1,4 +1,4 @@
-const studentDeviceService = require("../../services/student/studentDevice.service");
+const studentDeviceService = require("../../services/Student/studentDevice.service");
 
 const bindDevice = async (req, res, next) => {
   try {

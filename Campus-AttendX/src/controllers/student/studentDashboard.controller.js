@@ -1,4 +1,4 @@
-const studentDashboardService = require("../../services/student/studentDashboard.service");
+const studentDashboardService = require("../../services/Student/studentDashboard.service");
 
 // ==================================================
 // Get Student Dashboard

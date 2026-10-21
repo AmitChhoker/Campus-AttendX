@@ -1,4 +1,4 @@
-// src/services/student/studentDevice.service.js
+// src/services/Student/studentDevice.service.js
 const mongoose = require("mongoose");
 
 const User = require("../../models/User");
