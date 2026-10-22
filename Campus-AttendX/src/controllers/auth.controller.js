@@ -9,8 +9,8 @@ const redisClient = require("../config/redis");
 // =====================================================
 const getCookieOptions = (maxAge) => ({
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production", // Render par true hoga
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // Vercel-Render ke liye "none" zaroori hai
+    secure: process.env.NODE_ENV === "production", // Render par true
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // Cross-domain ke liye
     maxAge
 });
 
