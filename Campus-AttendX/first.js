@@ -96,7 +96,7 @@ app.use(cors({
 }));
 
 // Preflight requests ko handle karne ke liye
-app.options("*", cors());
+
 // Health check route
 app.get("/", (req, res) => {
     res.status(200).json({
