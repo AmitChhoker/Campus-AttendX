@@ -82,6 +82,13 @@ app.use(cors({
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
 }));
+// Health check route
+app.get("/", (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: "Campus-AttendX Backend API is running successfully!"
+    });
+});
 
 // Boot
 async function Initialization() {
