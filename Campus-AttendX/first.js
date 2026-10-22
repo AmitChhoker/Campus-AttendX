@@ -5,10 +5,45 @@ const cookieParser = require("cookie-parser");
 
 const app = express();
 
+// ==========================================
+// MIDDLEWARE (Sabse Pehle aana chahiye)
+// ==========================================
+app.use(cookieParser());
+app.use(express.json());
+
+// ==========================================
+// CORS SETUP (Routes se PEHLE)
+// ==========================================
+const allowedOrigins = [
+    "http://localhost:5173",
+    "https://campus-attendx-lyart.vercel.app" // Aapka Vercel URL
+];
+
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
+// ==========================================
 // DB + Redis
+// ==========================================
 const mongoDB = require("./src/db/database");
 const redisClient = require("./src/config/redis");
 
+// ==========================================
+// ROUTES IMPORT
+// ==========================================
 // Auth
 const recoveryRouter = require("./src/routes/recoveryRoutes");
 const authRouter = require("./src/routes/auth.routes");
@@ -29,7 +64,7 @@ const adminDashboardRouter = require("./src/routes/admin/adminDashboard.routes")
 const adminReportRouter = require("./src/routes/admin/adminReport.routes");
 const adminNotificationRouter = require("./src/routes/admin/adminNotification.routes");
 const adminProfileRouter = require("./src/routes/admin/adminProfile.routes");
-const adminAuditRouter = require("./src/routes/admin/adminAudit.routes");   // NEW
+const adminAuditRouter = require("./src/routes/admin/adminAudit.routes");
 
 // Student
 const studentDashboardRouter = require("./src/routes/student/studentDashboard.routes");
@@ -38,12 +73,13 @@ const studentSubjectsRouter = require("./src/routes/student/studentSubjects.rout
 const studentNotificationRouter = require("./src/routes/student/studentNotification.routes");
 const studentSettingsRouter = require("./src/routes/student/studentSettings.routes");
 const studentScanAttendanceRouter = require("./src/routes/student/studentScanAttendance.routes");
-const studentDeviceRouter = require("./src/routes/student/studentDevice.routes"); // NEW
+const studentDeviceRouter = require("./src/routes/student/studentDevice.routes");
 
-// Middleware
-app.use(cookieParser());
-app.use(express.json());
+const { startAttendanceCron } = require("./src/cron/attendanceWarning.cron");
 
+// ==========================================
+// ROUTES DEFINITION
+// ==========================================
 // Public
 app.use("/api/recovery", recoveryRouter);
 app.use("/api", authRouter);
@@ -64,7 +100,7 @@ app.use("/api/admin/dashboard", adminDashboardRouter);
 app.use("/api/admin/reports", adminReportRouter);
 app.use("/api/admin/dashboard/notifications", adminNotificationRouter);
 app.use("/api/admin/profile", adminProfileRouter);
-app.use("/api/admin/audit-logs", adminAuditRouter);   // NEW
+app.use("/api/admin/audit-logs", adminAuditRouter);
 
 // Student
 app.use("/api/student/dashboard", studentDashboardRouter);
@@ -73,31 +109,11 @@ app.use("/api/student/subjects", studentSubjectsRouter);
 app.use("/api/student/notifications", studentNotificationRouter);
 app.use("/api/student/settings", studentSettingsRouter);
 app.use("/api/student/scan-attendance", studentScanAttendanceRouter);
-app.use("/api/student/device", studentDeviceRouter);   // NEW
-const { startAttendanceCron } = require("./src/cron/attendanceWarning.cron");
+app.use("/api/student/device", studentDeviceRouter);
 
-/// CORS Setup - Allowing Vercel Frontend & Localhost
-const allowedOrigins = [
-    "http://localhost:5173",
-    "https://campus-attendx-lyart.vercel.app" // Aapka Vercel URL
-];
-
-app.use(cors({
-    origin: function (origin, callback) {
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"]
-}));
-
-// Preflight requests ko handle karne ke liye
-
-// Health check route
+// ==========================================
+// HEALTH CHECK ROUTE
+// ==========================================
 app.get("/", (req, res) => {
     res.status(200).json({
         success: true,
@@ -105,7 +121,18 @@ app.get("/", (req, res) => {
     });
 });
 
-// Boot
+// Global Error Handler (Express v5 ke liye zaroori hai)
+app.use((err, req, res, next) => {
+    console.error("Global Error:", err.message);
+    res.status(err.status || 500).json({
+        success: false,
+        message: err.message || "Internal Server Error"
+    });
+});
+
+// ==========================================
+// BOOT SERVER
+// ==========================================
 async function Initialization() {
     try {
         await Promise.all([mongoDB(), redisClient.connect()]);
@@ -115,7 +142,8 @@ async function Initialization() {
         app.listen(PORT, () => {
             console.log(`Server listening at port ${PORT}`);
         });
-                // Start the cron job after DB connects
+
+        // Start the cron job after DB connects
         startAttendanceCron();
         console.log("Cron Job Scheduled for Bi-monthly Warnings");
 
