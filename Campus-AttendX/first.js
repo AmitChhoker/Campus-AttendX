@@ -76,12 +76,27 @@ app.use("/api/student/scan-attendance", studentScanAttendanceRouter);
 app.use("/api/student/device", studentDeviceRouter);   // NEW
 const { startAttendanceCron } = require("./src/cron/attendanceWarning.cron");
 
-// Global error handler — ensures service errors surface properly
+/// CORS Setup - Allowing Vercel Frontend & Localhost
+const allowedOrigins = [
+    "http://localhost:5173",
+    "https://campus-attendx-lyart.vercel.app" // Aapka Vercel URL
+];
+
 app.use(cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
 }));
+
+// Preflight requests ko handle karne ke liye
+app.options("*", cors());
 // Health check route
 app.get("/", (req, res) => {
     res.status(200).json({
