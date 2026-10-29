@@ -27,12 +27,16 @@ const refresh = async () => {
 
  // login function
 const login = async (email, password) => {
+    // 1. Request bhejein
     const res = await client.post("/auth/login", { emailId: email, password });
-    // 🔥 Token ko localStorage mein save karein
+    
+    // 2. Token ko LocalStorage mein save karein
     if (res.data.token) {
         localStorage.setItem("token", res.data.token);
     }
-    await refresh();
+
+    // 3. User state update karein
+    setUser(res.data.user);
 };
 
 // logout function

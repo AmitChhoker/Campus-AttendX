@@ -76,6 +76,22 @@ const login = async (req, res) => {
         res.cookie("refreshToken", refreshToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
         
         res.json({ success: true, message: "Login successful",token: accessToken });
+        // Login function ke andar (try block ke end mein)
+res.status(200).json({ 
+    success: true, 
+    message: "Login successful",
+    token: accessToken, // 🔥 Frontend ko token diya
+    user: {
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        emailId: user.emailId,
+        role: user.role,
+        semester: user.semester,
+        branch: user.branch,
+        course: user.course
+    }
+});
     } catch (err) { 
         console.error("Login Error:", err.message);
         res.status(401).json({ success: false, message: err.message }); 
