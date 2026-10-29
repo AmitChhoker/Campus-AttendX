@@ -4,7 +4,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import client from "../../api/client";
 import { QrCode, Bluetooth, ShieldCheck, Fingerprint, CheckCircle } from "lucide-react";
 
-// Device Binding Helpers (Same as before)
+// Helper: Device Key generate/get karne ke liye
 const getStoredDevice = () => {
   let dev = localStorage.getItem("attendx_device");
   if (!dev) {
@@ -16,6 +16,7 @@ const getStoredDevice = () => {
   return JSON.parse(dev);
 };
 
+// Helper: HMAC Proof generate karne ke liye
 const generateProof = async (secret, prefix, challenge) => {
   const enc = new TextEncoder();
   const key = await window.crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
@@ -25,18 +26,19 @@ const generateProof = async (secret, prefix, challenge) => {
 
 export default function StudentMark() {
   const [step, setStep] = useState(1);
-  const [isScanning, setIsScanning] = useState(false); // <-- NAYA STATE
+  const [isScanning, setIsScanning] = useState(false);
   const [scannedData, setScannedData] = useState(null);
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
     const dev = getStoredDevice();
+    // Device bind karein taaki device verification pass ho
     client.post("/student/device/bind", { deviceId: dev.deviceId, deviceKey: dev.deviceKey }).catch(() => {});
   }, []);
 
+  // QR Scan Logic
   useEffect(() => {
-    // Camera tabhi chalega jab isScanning true hoga
     if (!isScanning) return;
     
     const scanner = new Html5Qrcode("reader");
@@ -50,7 +52,7 @@ export default function StudentMark() {
             if (parsed.sessionId && parsed.window !== undefined && parsed.qrToken) {
               setScannedData(parsed);
               setIsScanning(false);
-              setStep(2); // QR Verified
+              setStep(2); 
             } else {
               setError("Invalid QR format");
               setIsScanning(false);
@@ -64,19 +66,22 @@ export default function StudentMark() {
       () => {}
     ).catch(() => setError("Camera access denied."));
 
-    return () => {
-      scanner.stop().catch(() => {});
-    };
+    return () => { scanner.stop().catch(() => {}); };
   }, [isScanning]);
 
+  // Final Submit Logic
   const handleFinalSubmit = async () => {
     try {
       const dev = getStoredDevice();
       const challenge = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
       
+      // 1. Device Proof Generate karein
       const deviceProof = await generateProof(dev.deviceKey, "device:", challenge);
+      
+      // 2. Fingerprint Proof Generate karein
       const fingerprintProof = await generateProof(dev.deviceKey, "fingerprint:", challenge);
 
+      // 3. Backend ko send karein
       await client.post("/student/mark-attendance", {
         sessionId: scannedData.sessionId,
         window: scannedData.window,
@@ -84,10 +89,13 @@ export default function StudentMark() {
         deviceId: dev.deviceId,
         deviceProof,
         fingerprintProof,
+        
+        // BLE abhi ke liye mock bhej rahe hain (Web browser BLE support nahi karta)
+        // Agar REQUIRE_BLE=true hai, toh backend isko check karega
         bleRssi: -55 
       });
 
-      setStep(5);
+      setStep(5); // Success
     } catch (err) {
       setError(err.response?.data?.message || "Failed to mark attendance");
       setStep(1);
@@ -109,22 +117,16 @@ export default function StudentMark() {
 
       {error && <div className="error-box">{error}</div>}
 
-      {/* STEP 1: Intro Screen & Camera */}
       {step === 1 && (
         <div className="card center-text">
           <h3 className="card-title">Step 1: QR Code Scan</h3>
-          
           {!isScanning ? (
-            // Jab camera band hai tab ye dikhega
             <div style={{ padding: "2rem 1rem" }}>
               <QrCode size={64} className="mx-auto muted" />
-              <p className="mt muted">Point at teacher's QR code to mark attendance.</p>
-              <button className="btn btn-primary mt" onClick={() => setIsScanning(true)}>
-                📷 Start Camera
-              </button>
+              <p className="mt muted">Point at teacher's QR code.</p>
+              <button className="btn btn-primary mt" onClick={() => setIsScanning(true)}>📷 Start Camera</button>
             </div>
           ) : (
-            // Jab camera chalu hai tab ye dikhega
             <div>
               <div id="reader" style={{ width: "100%", borderRadius: "12px", overflow: "hidden" }}></div>
               <button className="btn btn-ghost mt" onClick={() => setIsScanning(false)}>Cancel</button>
@@ -133,12 +135,13 @@ export default function StudentMark() {
         </div>
       )}
 
+      {/* Baaki steps 2, 3, 4 waisa hi rahega */}
       {step === 2 && (
         <div className="card center-text">
           <h3 className="card-title">Step 2: BLE Proximity</h3>
           <Bluetooth size={64} className="mx-auto text-indigo mt" />
           <p className="mt text-green-500 font-bold">✓ QR Verified</p>
-          <p className="muted">Scanning for teacher's device...</p>
+          <p className="muted">Checking device proximity...</p>
           <button className="btn btn-primary full mt" onClick={() => setStep(3)}>Confirm Proximity</button>
         </div>
       )}
