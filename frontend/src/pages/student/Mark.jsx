@@ -29,18 +29,17 @@ export default function StudentMark() {
   const [isScanning, setIsScanning] = useState(false);
   const [scannedData, setScannedData] = useState(null);
   const [error, setError] = useState("");
+  
+  // 🔥 NEW STATE: Fingerprint scanning simulation ke liye
+  const [isAuthenticating, setIsAuthenticating] = useState(false); 
   const navigate = useNavigate();
 
   // Bind Device on Mount
   useEffect(() => {
     try {
       const dev = getStoredDevice();
-      client.post("/student/device/bind", { deviceId: dev.deviceId, deviceKey: dev.deviceKey })
-        .then(() => console.log("Device bound successfully"))
-        .catch((err) => console.log("Device bind note:", err.response?.data?.message));
-    } catch (err) {
-      console.error("Device bind error", err);
-    }
+      client.post("/student/device/bind", { deviceId: dev.deviceId, deviceKey: dev.deviceKey }).catch(() => {});
+    } catch (err) {}
   }, []);
 
   // QR Scan Logic
@@ -57,7 +56,6 @@ export default function StudentMark() {
           { facingMode: "environment" },
           { fps: 10, qrbox: { width: 250, height: 250 } },
           async (decodedText) => {
-            // 🔥 FIX: Scanner ko pehle stop karein, uske baad hi step change karein
             if (scanner) {
               await scanner.stop();
               await scanner.clear();
@@ -71,7 +69,7 @@ export default function StudentMark() {
                 setScannedData(parsed);
                 setIsScanning(false);
                 setError("");
-                setStep(2); // QR Scanned successfully
+                setStep(2); 
               } else {
                 setError("Invalid QR format");
                 setIsScanning(false);
@@ -81,7 +79,7 @@ export default function StudentMark() {
               setIsScanning(false);
             }
           },
-          () => {} // ignore scan errors
+          () => {} 
         );
       } catch (err) {
         setError("Camera access denied or not found.");
@@ -93,17 +91,21 @@ export default function StudentMark() {
 
     return () => {
       isMounted = false;
-      if (scanner) {
-        scanner.stop().catch(() => {});
-      }
+      if (scanner) scanner.stop().catch(() => {});
     };
   }, [isScanning]);
 
-  // Final Submit
+  // Final Submit with Fingerprint Simulation
   const handleFinalSubmit = async () => {
     try {
       setError("");
       if (!scannedData) throw new Error("No QR data found. Please scan again.");
+      
+      // 🔥 Start Fingerprint Simulation
+      setIsAuthenticating(true);
+
+      // 2 second ka delay (taaki user ko lage sensor scan ho raha hai)
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       const dev = getStoredDevice();
       const challenge = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
@@ -120,7 +122,7 @@ export default function StudentMark() {
         deviceId: dev.deviceId,
         deviceProof,
         fingerprintProof,
-        bleRssi: -55 // Mock BLE signal
+        bleRssi: -55 
       });
 
       setStep(5); // Success
@@ -129,6 +131,8 @@ export default function StudentMark() {
       setStep(1);
       setIsScanning(false);
       setScannedData(null);
+    } finally {
+      setIsAuthenticating(false); // 🔥 Stop Simulation
     }
   };
 
@@ -136,7 +140,6 @@ export default function StudentMark() {
     <div className="stack pb-20">
       <div className="page-head"><h2>Mark Attendance</h2></div>
 
-      {/* Progress Steps */}
       <div className="steps">
         {[1, 2, 3, 4].map((n) => (
           <div key={n} className={`step ${step >= n ? "active" : ""}`}>
@@ -145,7 +148,6 @@ export default function StudentMark() {
         ))}
       </div>
 
-      {/* Error Message */}
       {error && (
         <div className="error-box flex items-center gap-2">
           <AlertCircle size={20} />
@@ -174,13 +176,12 @@ export default function StudentMark() {
         </div>
       )}
 
-      {/* STEP 2: BLE (Simulated) */}
+      {/* STEP 2: BLE */}
       {step === 2 && (
         <div className="card center-text">
           <h3 className="card-title">Step 2: BLE Proximity</h3>
           <Bluetooth size={64} className="mx-auto text-indigo mt" />
           <p className="mt text-green-500 font-bold">✓ QR Verified</p>
-          <p className="muted">Scanning for teacher's device...</p>
           <button className="btn btn-primary full mt" onClick={() => setStep(3)}>Confirm Proximity</button>
         </div>
       )}
@@ -199,9 +200,24 @@ export default function StudentMark() {
       {step === 4 && (
         <div className="card center-text">
           <h3 className="card-title">Step 4: Fingerprint</h3>
-          <Fingerprint size={64} className="mx-auto text-indigo mt" />
-          <p className="mt">Place your finger to authenticate.</p>
-          <button className="btn btn-primary full mt" onClick={handleFinalSubmit}>Authenticate & Submit</button>
+          <Fingerprint size={64} className={`mx-auto mt ${isAuthenticating ? 'text-indigo animate-pulse' : 'text-indigo'}`} />
+          
+          {isAuthenticating ? (
+            <div className="mt">
+              <p className="text-indigo font-bold">⏳ Scanning biometric sensor...</p>
+              <p className="muted small">Please hold your finger on the sensor.</p>
+            </div>
+          ) : (
+            <p className="mt">Click below to authenticate.</p>
+          )}
+
+          <button 
+            className="btn btn-primary full mt" 
+            onClick={handleFinalSubmit}
+            disabled={isAuthenticating} // 🔥 Button disable ho jayega scan ke waqt
+          >
+            {isAuthenticating ? "Authenticating..." : "Authenticate & Submit"}
+          </button>
         </div>
       )}
 
