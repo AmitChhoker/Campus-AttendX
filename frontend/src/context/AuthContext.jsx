@@ -25,10 +25,10 @@ const refresh = async () => {
     })();
   }, []);
 
-  const login = async (emailId, password) => {
-    await client.post("/auth/login", { emailId, password });
-    return refresh();
-  };
+  const login = async (email, password) => {
+    await client.post("/auth/login", { emailId: email, password });
+    await refresh(); // User data fetch karne ke liye
+};
 
   const logout = async () => {
     try {

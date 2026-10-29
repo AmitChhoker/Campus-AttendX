@@ -1,12 +1,10 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { useToast } from "../context/ToastContext";
 import { GraduationCap, Mail, Lock } from "lucide-react";
 
 export default function Login() {
-  const { login } = useAuth();
-  const { error: toastError } = useToast(); // Rename to avoid conflict
+  const { login } = useAuth(); // Context se login function liya
   const navigate = useNavigate();
   
   const [emailId, setEmailId] = useState("");
@@ -14,19 +12,22 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
 
   const submit = async (e) => {
-    e.preventDefault();
+    e.preventDefault(); // Page reload hone se rokne ke liye
     setLoading(true);
+    
     try {
-        await login(emailId, password);
-        
-        // 🔥 navigate("/") ki jagah window.location.href use karein
-        window.location.href = "/"; 
-        
-    } catch (err) {
-        alert(err.response?.data?.message || "Login failed. Check credentials.");
-        setLoading(false);
+      // Login API call
+      await login(emailId, password);
+      
+      // Login successful! Ab page ko hard reload karo taaki nayi cookie set ho jaye
+      window.location.href = "/"; 
+      
+    } catch (error) {
+      // Agar backend error de (jaise galat password)
+      alert(error.response?.data?.message || "Login failed. Please check credentials.");
+      setLoading(false);
     }
-};
+  };
 
   return (
     <div className="auth-page">
@@ -36,6 +37,7 @@ export default function Login() {
           <h1>AttendX</h1>
           <p>Sign in to your campus attendance account</p>
         </div>
+        
         <form onSubmit={submit} className="form">
           <label className="field">
             <span>Email</span>
@@ -47,7 +49,6 @@ export default function Login() {
                 value={emailId}
                 onChange={(e) => setEmailId(e.target.value)}
                 placeholder="you@svsu.ac.in"
-                autoComplete="email"
               />
             </div>
           </label>
@@ -62,7 +63,6 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                autoComplete="current-password"
               />
             </div>
           </label>
