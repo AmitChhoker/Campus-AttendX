@@ -50,17 +50,24 @@ const login = async (req, res) => {
         const { emailId, password } = req.body;
         
         const user = await User.findOne({ emailId: emailId.toLowerCase().trim() });
-        if (!user) throw new Error("User not found. Please register first.");
+        if (!user) {
+            return res.status(401).json({ success: false, message: "User not found. Please register first." });
+        }
         
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) throw new Error("Invalid password");
+        if (!isMatch) {
+            return res.status(401).json({ success: false, message: "Invalid password" });
+        }
         
-        if (!user.isActive) throw new Error("Account is inactive");
+        if (!user.isActive) {
+            return res.status(403).json({ success: false, message: "Account is inactive" });
+        }
 
+        // Tokens Generate karein
         const accessToken = jwt.sign(
             { _id: user._id, role: user.role, adminBranch: user.adminBranch }, 
             process.env.JWT_SECRET_KEY, 
-            { expiresIn: "15m" }
+            { expiresIn: "1d" } // Thoda time badha diya testing ke liye
         );
         
         const refreshToken = jwt.sign(
@@ -69,32 +76,33 @@ const login = async (req, res) => {
             { expiresIn: "7d" }
         );
 
+        // Redis mein refresh token save karein
         await redisClient.set(`refreshToken:${user._id}`, refreshToken, { EX: 7 * 24 * 60 * 60 });
 
-        // Cookie set karna
-        res.cookie("token", accessToken, getCookieOptions(15 * 60 * 1000));
-        res.cookie("refreshToken", refreshToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
-        
-        res.json({ success: true, message: "Login successful",token: accessToken });
-        // Login function ke andar (try block ke end mein)
-res.status(200).json({ 
-    success: true, 
-    message: "Login successful",
-    token: accessToken, // 🔥 Frontend ko token diya
-    user: {
-        _id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        emailId: user.emailId,
-        role: user.role,
-        semester: user.semester,
-        branch: user.branch,
-        course: user.course
-    }
-});
+        // 🔥 SIRF EK BAAR RESPONSE BHEJEIN (Purana res.cookie wala code hata dein)
+        return res.status(200).json({ 
+            success: true, 
+            message: "Login successful",
+            token: accessToken, // Frontend isko LocalStorage mein save karega
+            user: {
+                _id: user._id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                emailId: user.emailId,
+                role: user.role,
+                semester: user.semester,
+                branch: user.branch,
+                course: user.course
+            }
+        });
+
     } catch (err) { 
         console.error("Login Error:", err.message);
-        res.status(401).json({ success: false, message: err.message }); 
+        
+        // Agar headers pehle hi send ho chuke hain, toh dobara send mat karein
+        if (!res.headersSent) {
+            return res.status(500).json({ success: false, message: "Internal server error" });
+        }
     }
 };
 
