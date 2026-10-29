@@ -35,7 +35,9 @@ export default function StudentMark() {
   useEffect(() => {
     try {
       const dev = getStoredDevice();
-      client.post("/student/device/bind", { deviceId: dev.deviceId, deviceKey: dev.deviceKey }).catch(() => {});
+      client.post("/student/device/bind", { deviceId: dev.deviceId, deviceKey: dev.deviceKey })
+        .then(() => console.log("Device bound successfully"))
+        .catch((err) => console.log("Device bind note:", err.response?.data?.message));
     } catch (err) {
       console.error("Device bind error", err);
     }
@@ -46,31 +48,37 @@ export default function StudentMark() {
     if (!isScanning) return;
     
     let scanner = null;
+    let isMounted = true;
+
     const startScanner = async () => {
       try {
         scanner = new Html5Qrcode("reader");
         await scanner.start(
           { facingMode: "environment" },
           { fps: 10, qrbox: { width: 250, height: 250 } },
-          (decodedText) => {
+          async (decodedText) => {
+            // 🔥 FIX: Scanner ko pehle stop karein, uske baad hi step change karein
             if (scanner) {
-              scanner.stop().then(() => {
-                try {
-                  const parsed = JSON.parse(decodedText);
-                  if (parsed.sessionId && parsed.window !== undefined && parsed.qrToken) {
-                    setScannedData(parsed);
-                    setIsScanning(false);
-                    setError("");
-                    setStep(2); // QR Scanned successfully
-                  } else {
-                    setError("Invalid QR format");
-                    setIsScanning(false);
-                  }
-                } catch (e) {
-                  setError("Invalid QR Code. Please scan the teacher's QR.");
-                  setIsScanning(false);
-                }
-              }).catch(console.error);
+              await scanner.stop();
+              await scanner.clear();
+              scanner = null;
+            }
+            if (!isMounted) return;
+
+            try {
+              const parsed = JSON.parse(decodedText);
+              if (parsed.sessionId && parsed.window !== undefined && parsed.qrToken) {
+                setScannedData(parsed);
+                setIsScanning(false);
+                setError("");
+                setStep(2); // QR Scanned successfully
+              } else {
+                setError("Invalid QR format");
+                setIsScanning(false);
+              }
+            } catch (e) {
+              setError("Invalid QR Code. Please scan the teacher's QR.");
+              setIsScanning(false);
             }
           },
           () => {} // ignore scan errors
@@ -84,6 +92,7 @@ export default function StudentMark() {
     startScanner();
 
     return () => {
+      isMounted = false;
       if (scanner) {
         scanner.stop().catch(() => {});
       }
