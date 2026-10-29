@@ -767,3 +767,222 @@ p  { margin: 0.25rem 0; }
 .full { width: 100%; }
 .big { padding: 1rem; font-size: 1rem; }
 .block { display: block; }
+
+/* =========================================
+   MODERN SCAN DASHBOARD STYLES
+   ========================================= */
+
+.scan-dashboard {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+/* --- Stepper --- */
+.modern-stepper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  position: relative;
+  padding: 0 1rem;
+}
+
+.stepper-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+  flex: 1;
+}
+
+.stepper-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: all 0.3s ease;
+}
+
+.stepper-circle.active {
+  background: var(--indigo-100);
+  border-color: var(--indigo);
+  color: var(--indigo);
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+  transform: scale(1.1);
+}
+
+.stepper-circle.completed {
+  background: var(--emerald);
+  border-color: var(--emerald);
+  color: white;
+}
+
+.stepper-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-top: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stepper-label.active {
+  color: var(--indigo);
+}
+
+.stepper-line {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--border);
+  z-index: -1;
+  transition: all 0.3s ease;
+}
+
+.stepper-line.completed {
+  background: var(--emerald);
+}
+
+/* --- Glassmorphism Panel --- */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 20px;
+  padding: 2.5rem 1.5rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+/* --- Scanner UI --- */
+.scanner-container {
+  position: relative;
+  width: 100%;
+  max-width: 300px;
+  height: 300px;
+  margin: 0 auto;
+  border-radius: 20px;
+  border: 2px dashed var(--border);
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.scanner-container.scanning {
+  border: 2px solid var(--indigo);
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+}
+
+.scanner-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+
+.camera-view {
+  width: 100%;
+  height: 100%;
+}
+
+.camera-view video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+}
+
+/* Scanning Laser Animation */
+.scan-laser {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: rgba(99, 102, 241, 0.8);
+  box-shadow: 0 0 10px var(--indigo);
+  display: none;
+}
+
+.scanner-container.scanning .scan-laser {
+  display: block;
+  animation: laser-scan 2s linear infinite;
+}
+
+@keyframes laser-scan {
+  0% { top: 0; opacity: 0.5; }
+  50% { top: 100%; opacity: 1; }
+  100% { top: 0; opacity: 0.5; }
+}
+
+/* --- Fingerprint UI --- */
+.fingerprint-sensor {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 1.5rem;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--indigo-100);
+  overflow: hidden;
+}
+
+.fingerprint-sensor.scanning {
+  border-color: var(--indigo);
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+}
+
+.fingerprint-laser {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--indigo);
+  box-shadow: 0 0 10px var(--indigo);
+  opacity: 0;
+}
+
+.fingerprint-sensor.scanning .fingerprint-laser {
+  opacity: 1;
+  animation: fp-scan 1.5s linear infinite;
+}
+
+@keyframes fp-scan {
+  0% { top: 10%; }
+  50% { top: 90%; }
+  100% { top: 10%; }
+}
+
+/* --- Utility Animations --- */
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.success-checkmark {
+  animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes popIn {
+  0% { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}

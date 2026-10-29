@@ -24,13 +24,18 @@ const generateProof = async (secret, prefix, challenge) => {
   return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
 };
 
+const STEPS = [
+  { id: 1, label: "Scan QR", icon: QrCode },
+  { id: 2, label: "BLE Check", icon: Bluetooth },
+  { id: 3, label: "Device", icon: ShieldCheck },
+  { id: 4, label: "Biometric", icon: Fingerprint }
+];
+
 export default function StudentMark() {
   const [step, setStep] = useState(1);
   const [isScanning, setIsScanning] = useState(false);
   const [scannedData, setScannedData] = useState(null);
   const [error, setError] = useState("");
-  
-  // 🔥 NEW STATE: Fingerprint scanning simulation ke liye
   const [isAuthenticating, setIsAuthenticating] = useState(false); 
   const navigate = useNavigate();
 
@@ -54,7 +59,7 @@ export default function StudentMark() {
         scanner = new Html5Qrcode("reader");
         await scanner.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+          { fps: 10, qrbox: { width: 220, height: 220 } },
           async (decodedText) => {
             if (scanner) {
               await scanner.stop();
@@ -69,7 +74,7 @@ export default function StudentMark() {
                 setScannedData(parsed);
                 setIsScanning(false);
                 setError("");
-                setStep(2); 
+                setStep(2); // Move to BLE step
               } else {
                 setError("Invalid QR format");
                 setIsScanning(false);
@@ -101,20 +106,15 @@ export default function StudentMark() {
       setError("");
       if (!scannedData) throw new Error("No QR data found. Please scan again.");
       
-      // 🔥 Start Fingerprint Simulation
-      setIsAuthenticating(true);
-
-      // 2 second ka delay (taaki user ko lage sensor scan ho raha hai)
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      setIsAuthenticating(true); // Start Animation
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Fake sensor delay
       
       const dev = getStoredDevice();
       const challenge = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
       
-      // Generate Proofs
       const deviceProof = await generateProof(dev.deviceKey, "device:", challenge);
       const fingerprintProof = await generateProof(dev.deviceKey, "fingerprint:", challenge);
 
-      // Send to Backend
       await client.post("/student/scan-attendance/scan", {
         sessionId: scannedData.sessionId,
         window: scannedData.window,
@@ -132,104 +132,128 @@ export default function StudentMark() {
       setIsScanning(false);
       setScannedData(null);
     } finally {
-      setIsAuthenticating(false); // 🔥 Stop Simulation
+      setIsAuthenticating(false);
     }
   };
 
   return (
-    <div className="stack pb-20">
-      <div className="page-head"><h2>Mark Attendance</h2></div>
-
-      <div className="steps">
-        {[1, 2, 3, 4].map((n) => (
-          <div key={n} className={`step ${step >= n ? "active" : ""}`}>
-            <div className="step-dot">{n}</div>
-          </div>
-        ))}
+    <div className="scan-dashboard pb-20">
+      
+      {/* Modern Stepper Header */}
+      <div className="modern-stepper">
+        {STEPS.map((s, i) => {
+          const isActive = step === s.id;
+          const isCompleted = step > s.id;
+          
+          return (
+            <div key={s.id} className="stepper-item">
+              <div className={`stepper-circle ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}>
+                {isCompleted ? <CheckCircle size={20} /> : <s.icon size={20} />}
+              </div>
+              <span className={`stepper-label ${isActive ? 'active' : ''}`}>{s.label}</span>
+              {i !== STEPS.length - 1 && <div className={`stepper-line ${isCompleted ? 'completed' : ''}`} />}
+            </div>
+          );
+        })}
       </div>
 
-      {error && (
-        <div className="error-box flex items-center gap-2">
-          <AlertCircle size={20} />
-          <span>{error}</span>
-        </div>
-      )}
+      <div className="scan-content">
+        {error && (
+          <div className="error-box glass-panel mb-4">
+            <AlertCircle size={20} />
+            <span>{error}</span>
+          </div>
+        )}
 
-      {/* STEP 1: QR SCAN */}
-      {step === 1 && (
-        <div className="card center-text">
-          <h3 className="card-title">Step 1: QR Code Scan</h3>
-          {!isScanning ? (
-            <div style={{ padding: "2rem 1rem" }}>
-              <QrCode size={64} className="mx-auto muted" />
-              <p className="mt muted">Point at teacher's QR code.</p>
-              <button className="btn btn-primary mt" onClick={() => { setError(""); setIsScanning(true); }}>
-                📷 Start Camera
-              </button>
+        {/* STEP 1: QR SCAN */}
+        {step === 1 && (
+          <div className="glass-panel text-center animate-fade-in">
+            <h2 className="text-2xl font-bold mb-2">Scan Attendance QR</h2>
+            <p className="text-muted mb-6">Position the QR code inside the frame</p>
+            
+            <div className={`scanner-container ${isScanning ? 'scanning' : ''}`}>
+              {!isScanning ? (
+                <div className="scanner-placeholder" onClick={() => { setError(""); setIsScanning(true); }}>
+                  <QrCode size={64} className="text-indigo-500 mb-4" />
+                  <button className="btn btn-primary">Open Camera</button>
+                </div>
+              ) : (
+                <div id="reader" className="camera-view"></div>
+              )}
+              <div className="scan-laser"></div>
             </div>
-          ) : (
-            <div>
-              <div id="reader" style={{ width: "100%", borderRadius: "12px", overflow: "hidden" }}></div>
-              <button className="btn btn-ghost mt" onClick={() => setIsScanning(false)}>Cancel</button>
+            
+            {isScanning && (
+              <button className="btn btn-ghost mt-4 w-full" onClick={() => setIsScanning(false)}>Cancel</button>
+            )}
+          </div>
+        )}
+
+        {/* STEP 2: BLE */}
+        {step === 2 && (
+          <div className="glass-panel text-center animate-fade-in">
+            <div className="icon-pulse-ring">
+              <Bluetooth size={48} className="text-indigo-500" />
             </div>
-          )}
-        </div>
-      )}
+            <h2 className="text-2xl font-bold mb-2">BLE Verification</h2>
+            <p className="text-green-500 font-semibold mb-6">✓ QR Code Verified</p>
+            <p className="text-muted mb-6">Scanning for teacher's bluetooth beacon...</p>
+            <button className="btn btn-primary w-full" onClick={() => setStep(3)}>Confirm Proximity</button>
+          </div>
+        )}
 
-      {/* STEP 2: BLE */}
-      {step === 2 && (
-        <div className="card center-text">
-          <h3 className="card-title">Step 2: BLE Proximity</h3>
-          <Bluetooth size={64} className="mx-auto text-indigo mt" />
-          <p className="mt text-green-500 font-bold">✓ QR Verified</p>
-          <button className="btn btn-primary full mt" onClick={() => setStep(3)}>Confirm Proximity</button>
-        </div>
-      )}
-
-      {/* STEP 3: DEVICE */}
-      {step === 3 && (
-        <div className="card center-text">
-          <h3 className="card-title">Step 3: Device Check</h3>
-          <ShieldCheck size={64} className="mx-auto text-green-500 mt" />
-          <p className="mt text-green-500 font-bold">✓ Device verified</p>
-          <button className="btn btn-primary full mt" onClick={() => setStep(4)}>Continue</button>
-        </div>
-      )}
-
-      {/* STEP 4: FINGERPRINT */}
-      {step === 4 && (
-        <div className="card center-text">
-          <h3 className="card-title">Step 4: Fingerprint</h3>
-          <Fingerprint size={64} className={`mx-auto mt ${isAuthenticating ? 'text-indigo animate-pulse' : 'text-indigo'}`} />
-          
-          {isAuthenticating ? (
-            <div className="mt">
-              <p className="text-indigo font-bold">⏳ Scanning biometric sensor...</p>
-              <p className="muted small">Please hold your finger on the sensor.</p>
+        {/* STEP 3: DEVICE */}
+        {step === 3 && (
+          <div className="glass-panel text-center animate-fade-in">
+             <div className="icon-pulse-ring">
+              <ShieldCheck size={48} className="text-green-500" />
             </div>
-          ) : (
-            <p className="mt">Click below to authenticate.</p>
-          )}
+            <h2 className="text-2xl font-bold mb-2">Device Check</h2>
+            <p className="text-green-500 font-semibold mb-6">✓ Device Authenticated</p>
+            <p className="text-muted mb-6">Your unique device signature matches our records.</p>
+            <button className="btn btn-primary w-full" onClick={() => setStep(4)}>Continue to Biometric</button>
+          </div>
+        )}
 
-          <button 
-            className="btn btn-primary full mt" 
-            onClick={handleFinalSubmit}
-            disabled={isAuthenticating} // 🔥 Button disable ho jayega scan ke waqt
-          >
-            {isAuthenticating ? "Authenticating..." : "Authenticate & Submit"}
-          </button>
-        </div>
-      )}
+        {/* STEP 4: FINGERPRINT */}
+        {step === 4 && (
+          <div className="glass-panel text-center animate-fade-in">
+            <div className={`fingerprint-sensor ${isAuthenticating ? 'scanning' : ''}`}>
+              <Fingerprint size={80} className="text-indigo-500" />
+              <div className="fingerprint-laser"></div>
+            </div>
+            
+            <h2 className="text-2xl font-bold mb-2">Biometric Auth</h2>
+            {isAuthenticating ? (
+              <p className="text-indigo-500 font-bold animate-pulse mb-6">Scanning biometric sensor...</p>
+            ) : (
+              <p className="text-muted mb-6">Tap below to authenticate your fingerprint.</p>
+            )}
 
-      {/* STEP 5: SUCCESS */}
-      {step === 5 && (
-        <div className="card center-text">
-          <CheckCircle size={64} className="mx-auto text-green-500" />
-          <h3 className="text-green-500 mt">SUCCESS</h3>
-          <p>Attendance marked successfully!</p>
-          <button className="btn btn-primary full mt" onClick={() => navigate("/student")}>Back to Dashboard</button>
-        </div>
-      )}
+            <button 
+              className="btn btn-primary w-full" 
+              onClick={handleFinalSubmit}
+              disabled={isAuthenticating}
+            >
+              {isAuthenticating ? "Authenticating..." : "Authenticate & Submit"}
+            </button>
+          </div>
+        )}
+
+        {/* STEP 5: SUCCESS */}
+        {step === 5 && (
+          <div className="glass-panel text-center animate-fade-in success-panel">
+            <div className="success-checkmark">
+              <CheckCircle size={80} className="text-green-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-green-500 mb-2">Attendance Marked!</h2>
+            <p className="text-muted mb-6">Your presence has been successfully recorded.</p>
+            <button className="btn btn-primary w-full" onClick={() => navigate("/student")}>
+              Back to Dashboard
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
