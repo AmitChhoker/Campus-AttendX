@@ -1,9 +1,14 @@
 const jwt = require("jsonwebtoken");
+const redisClient = require("../config/redis"); // Apna path check kar lein
 
-const authentication = async (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
     try {
-        // Get access token from the cookie
-        const token = req.cookies?.token;
+        // 1. Token ko Cookies aur Authorization Header dono se check karein
+        let token = req.cookies?.token;
+
+        if (!token && req.headers.authorization && req.headers.authorization.startsWith("Bearer ")) {
+            token = req.headers.authorization.split(" ")[1];
+        }
 
         if (!token) {
             return res.status(401).json({
@@ -12,17 +17,11 @@ const authentication = async (req, res, next) => {
             });
         }
 
-        // Verify JWT
-        const payload = jwt.verify(
-            token,
-            process.env.JWT_SECRET_KEY
-        );
+        // 2. Verify JWT
+        const payload = jwt.verify(token, process.env.JWT_SECRET_KEY);
 
-        // Check whether the token has been revoked in Redis
-        const redisClient = require("../config/redis");
-
+        // 3. Check if token is blacklisted (Redis)
         const isBlocked = await redisClient.get(`token:${token}`);
-
         if (isBlocked) {
             return res.status(401).json({
                 success: false,
@@ -30,7 +29,7 @@ const authentication = async (req, res, next) => {
             });
         }
 
-        // Store authenticated user information
+        // 4. Attach user to request
         req.user = {
             id: payload._id,
             emailId: payload.emailId,
@@ -38,14 +37,9 @@ const authentication = async (req, res, next) => {
             adminBranch: payload.adminBranch || null
         };
 
-        return next();
-
+        next();
     } catch (err) {
-        // Handle invalid or expired JWTs
-        if (
-            err.name === "TokenExpiredError" ||
-            err.name === "JsonWebTokenError"
-        ) {
+        if (err.name === "TokenExpiredError" || err.name === "JsonWebTokenError") {
             return res.status(401).json({
                 success: false,
                 message: "Invalid or expired token"
@@ -53,7 +47,6 @@ const authentication = async (req, res, next) => {
         }
 
         console.error("Authentication error:", err);
-
         return res.status(500).json({
             success: false,
             message: "Authentication failed"
@@ -61,4 +54,4 @@ const authentication = async (req, res, next) => {
     }
 };
 
-module.exports = authentication;
+module.exports = authMiddleware;
