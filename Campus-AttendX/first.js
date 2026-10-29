@@ -6,30 +6,33 @@ const cookieParser = require("cookie-parser");
 const app = express();
 
 // ==========================================
-// 🔥 SABSE ZAROORI FIX (Render Proxy & Cookies)
+// 🔥 RENDER PROXY SETTING (Secure Cookies ke liye)
 // ==========================================
-// Render ek reverse proxy use karta hai. Iske bina secure cookies browser tak nahi pahunchti.
 app.set('trust proxy', 1); 
 
 // ==========================================
-// CORS SETUP (Routes aur Parsers se PEHLE)
+// CORS SETUP (Sahi Origins ke saath)
 // ==========================================
 const allowedOrigins = [
     "http://localhost:5173",
     "http://localhost:5174",
-    "https://campus-attendx-lyart.vercel.app/login" 
+    "https://campus-attendx-lyart.vercel.app" // <-- Aapka Exact Vercel URL
 ];
 
 app.use(cors({
     origin: function (origin, callback) {
+        // Postman ya mobile app ke liye (no origin)
         if (!origin) return callback(null, true);
+        
+        // Localhost ya exact Vercel URL allow karein
         if (origin.startsWith("http://localhost:") || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
+            console.log("Blocked by CORS:", origin); // Debugging ke liye
             callback(new Error('Not allowed by CORS'));
         }
     },
-    credentials: true, // Cookies allow karne ke liye zaroori
+    credentials: true, // Cookies allow karne ke liye sabse zaroori
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"]
 }));
@@ -128,7 +131,7 @@ app.get("/", (req, res) => {
     });
 });
 
-// Global Error Handler (Express v5 ke liye zaroori hai)
+// Global Error Handler (Express v5)
 app.use((err, req, res, next) => {
     console.error("Global Error:", err.message);
     res.status(err.status || 500).json({
