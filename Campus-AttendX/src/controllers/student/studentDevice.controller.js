@@ -11,6 +11,7 @@ const bindDevice = async (req, res, next) => {
       });
     }
 
+    // 🔥 Function call yahan ho raha hai
     const result = await studentDeviceService.bindDevice({
       studentId: req.user.id,
       deviceId,
@@ -19,9 +20,7 @@ const bindDevice = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: result.alreadyBound
-        ? "Device already bound."
-        : "Device bound successfully.",
+      message: result.alreadyBound ? "Device already bound." : "Device bound successfully.",
       data: result
     });
   } catch (error) {
