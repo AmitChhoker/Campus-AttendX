@@ -17,7 +17,7 @@ app.set('trust proxy', 1);
 const allowedOrigins = [
     "http://localhost:5173",
     "http://localhost:5174",
-    "https://campus-attendx-lyart.vercel.app" // <-- Apne exact Vercel URL se match karein
+    "https://campus-attendx-lyart.vercel.app/login" 
 ];
 
 app.use(cors({
