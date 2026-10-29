@@ -6,38 +6,37 @@ const cookieParser = require("cookie-parser");
 const app = express();
 
 // ==========================================
-// 🔥 RENDER PROXY SETTING (Secure Cookies ke liye)
+// 🔥 RENDER PROXY SETTING
 // ==========================================
 app.set('trust proxy', 1); 
 
 // ==========================================
-// CORS SETUP (Sahi Origins ke saath)
+// CORS SETUP
 // ==========================================
-const allowedOrigins = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "https://campus-attendx-lyart.vercel.app" // Purana URL (optional)
-];
-
 app.use(cors({
     origin: function (origin, callback) {
         if (!origin) return callback(null, true);
         if (origin.startsWith("http://localhost:") || origin.includes("vercel.app")) {
             return callback(null, true);
         }
+        console.log("Blocked by CORS:", origin);
         callback(new Error('Not allowed by CORS'));
     },
-    credentials: true, // Cookies allow karne ke liye
+    credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"]
 }));
-// 🔥 API responses ko cache hone se rokne ke liye
+
+// ==========================================
+// CACHE DISABLE (304 Error se bachne ke liye)
+// ==========================================
 app.use((req, res, next) => {
     res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.set("Pragma", "no-cache");
     res.set("Expires", "0");
     next();
 });
+
 // ==========================================
 // MIDDLEWARE
 // ==========================================
@@ -53,19 +52,15 @@ const redisClient = require("./src/config/redis");
 // ==========================================
 // ROUTES IMPORT
 // ==========================================
-// Auth
 const recoveryRouter = require("./src/routes/recoveryRoutes");
 const authRouter = require("./src/routes/auth.routes");
 
-// Faculty
 const subjectRouter = require("./src/routes/faculty/subject.routes");
 const attendanceSessionRouter = require("./src/routes/faculty/attendanceSession.routes");
 const facultySettingsRouter = require("./src/routes/faculty/facultySettings.routes");
 
-// Google
 const googleRouter = require("./src/routes/google.routes");
 
-// Admin
 const adminSubjectRouter = require("./src/routes/admin/adminSubject.routes");
 const adminAttendanceRouter = require("./src/routes/admin/adminAttendance.routes");
 const adminUserRouter = require("./src/routes/admin/adminUser.routes");
@@ -75,13 +70,12 @@ const adminNotificationRouter = require("./src/routes/admin/adminNotification.ro
 const adminProfileRouter = require("./src/routes/admin/adminProfile.routes");
 const adminAuditRouter = require("./src/routes/admin/adminAudit.routes");
 
-// Student
 const studentDashboardRouter = require("./src/routes/student/studentDashboard.routes");
 const studentAttendanceRouter = require("./src/routes/student/studentAttendance.routes");
 const studentSubjectsRouter = require("./src/routes/student/studentSubjects.routes");
 const studentNotificationRouter = require("./src/routes/student/studentNotification.routes");
 const studentSettingsRouter = require("./src/routes/student/studentSettings.routes");
-const studentScanAttendanceRouter = require("./src/routes/student/studentScanAttendance.routes");
+const studentScanAttendanceRouter = require("./src/routes/student/studentScanAttendance.routes"); // <-- Scan Route
 const studentDeviceRouter = require("./src/routes/student/studentDevice.routes");
 const studentRoutes = require("./src/routes/student/student.routes"); 
 
@@ -90,19 +84,15 @@ const { startAttendanceCron } = require("./src/cron/attendanceWarning.cron");
 // ==========================================
 // ROUTES DEFINITION
 // ==========================================
-// Public
 app.use("/api/recovery", recoveryRouter);
 app.use("/api/auth", authRouter);
 
-// Faculty
 app.use("/api/subjects", subjectRouter);
 app.use("/api/attendance-sessions", attendanceSessionRouter);
 app.use("/api/faculty/settings", facultySettingsRouter);
 
-// Google
 app.use("/api/google", googleRouter);
 
-// Admin
 app.use("/api/admin/subjects", adminSubjectRouter);
 app.use("/api/admin/attendance", adminAttendanceRouter);
 app.use("/api/admin/users", adminUserRouter);
@@ -112,13 +102,15 @@ app.use("/api/admin/dashboard/notifications", adminNotificationRouter);
 app.use("/api/admin/profile", adminProfileRouter);
 app.use("/api/admin/audit-logs", adminAuditRouter);
 
-// Student
 app.use("/api/student/dashboard", studentDashboardRouter);
 app.use("/api/student/attendance", studentAttendanceRouter);
 app.use("/api/student/subjects", studentSubjectsRouter);
 app.use("/api/student/notifications", studentNotificationRouter);
 app.use("/api/student/settings", studentSettingsRouter);
+
+// 🔥 SCAN ATTENDANCE ROUTE
 app.use("/api/student/scan-attendance", studentScanAttendanceRouter);
+
 app.use("/api/student/device", studentDeviceRouter);
 app.use("/api/student", studentRoutes); 
 
@@ -132,7 +124,7 @@ app.get("/", (req, res) => {
     });
 });
 
-// Global Error Handler (Express v5)
+// Global Error Handler
 app.use((err, req, res, next) => {
     console.error("Global Error:", err.message);
     res.status(err.status || 500).json({
@@ -154,7 +146,6 @@ async function Initialization() {
             console.log(`Server listening at port ${PORT}`);
         });
 
-        // Start the cron job after DB connects
         startAttendanceCron();
         console.log("Cron Job Scheduled for Bi-monthly Warnings");
 

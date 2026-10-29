@@ -113,7 +113,7 @@ export default function StudentMark() {
       const fingerprintProof = await generateProof(dev.deviceKey, "fingerprint:", challenge);
 
       // Send to Backend
-      await client.post("/student/mark-attendance", {
+      await client.post("/student/scan-attendance/scan", {
         sessionId: scannedData.sessionId,
         window: scannedData.window,
         qrToken: scannedData.qrToken,

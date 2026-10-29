@@ -1,26 +1,11 @@
 const express = require("express");
-
-const authMiddleware = require(
-  "../../middleware/authMiddleware"
-);
-
-const roleMiddleware = require(
-  "../../middleware/role.middleware"
-);
-
-const {
-  scanAttendance,
-} = require(
-  "../../controllers/student/studentScanAttendance.controller"
-);
-
 const router = express.Router();
+const { scanAttendance } = require("../../controllers/student/studentScanAttendance.controller");
+const authMiddleware = require("../../middleware/auth.middleware");
+const roleMiddleware = require("../../middleware/role.middleware");
 
-// Only authenticated students can use this endpoint.
-router.use(
-  authMiddleware,
-  roleMiddleware("student")
-);
+// Middleware
+router.use(authMiddleware, roleMiddleware("student"));
 
 // POST /api/student/scan-attendance/scan
 router.post("/scan", scanAttendance);
