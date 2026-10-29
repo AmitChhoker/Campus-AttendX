@@ -9,8 +9,8 @@ const { sendSms } = require("../utils/sms");
 // Helper function (Ab logout aur refresh token dono mein kaam aayega)
 const getCookieOptions = (maxAge) => ({
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    secure: process.env.NODE_ENV === "production", // Render par true hona chahiye
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // Vercel-Render ke liye "none" zaroori hai
     maxAge
 });
 

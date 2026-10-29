@@ -6,10 +6,9 @@ const API_URL = import.meta.env.PROD
   : "http://localhost:4000/api"; // <-- Apna backend port yahan daalein (4000)
 
 const client = axios.create({
-  baseURL: API_URL,
-  withCredentials: true,
-  headers: { "Content-Type": "application/json" },
-  timeout: 60000, 
+    baseURL: import.meta.env.VITE_API_URL || "http://localhost:4000/api",
+    withCredentials: true, // <-- Cookies ke liye zaroori
+    headers: { "Content-Type": "application/json" },
 });
 
 // ... baaki interceptor code same rahega ...

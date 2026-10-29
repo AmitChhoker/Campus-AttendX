@@ -6,36 +6,39 @@ const cookieParser = require("cookie-parser");
 const app = express();
 
 // ==========================================
-// MIDDLEWARE (Sabse Pehle aana chahiye)
+// 🔥 SABSE ZAROORI FIX (Render Proxy & Cookies)
 // ==========================================
-app.use(cookieParser());
-app.use(express.json());
+// Render ek reverse proxy use karta hai. Iske bina secure cookies browser tak nahi pahunchti.
+app.set('trust proxy', 1); 
 
 // ==========================================
-// CORS SETUP (Routes se PEHLE)
+// CORS SETUP (Routes aur Parsers se PEHLE)
 // ==========================================
 const allowedOrigins = [
     "http://localhost:5173",
-    "http://localhost:5174", // <-- Ye line add karein
-    "https://campus-attendx-lyart.vercel.app"
+    "http://localhost:5174",
+    "https://campus-attendx-lyart.vercel.app" // <-- Apne exact Vercel URL se match karein
 ];
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-        
-        // Allow any localhost port for local development
         if (origin.startsWith("http://localhost:") || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
         }
     },
-    credentials: true,
+    credentials: true, // Cookies allow karne ke liye zaroori
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"]
 }));
+
+// ==========================================
+// MIDDLEWARE
+// ==========================================
+app.use(express.json());
+app.use(cookieParser());
 
 // ==========================================
 // DB + Redis
