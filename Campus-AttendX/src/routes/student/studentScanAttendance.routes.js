@@ -1,13 +1,15 @@
 const express = require("express");
 const router = express.Router();
+
+// 🔥 Sahi Paths (Apne folder names ke hisaab se check kar lena)
 const { scanAttendance } = require("../../controllers/student/studentScanAttendance.controller");
-const authMiddleware = require("../../middleware/auth.middleware");
+const authMiddleware = require("../../middleware/authMiddleware"); 
 const roleMiddleware = require("../../middleware/role.middleware");
 
-// Middleware
+// Middleware check
 router.use(authMiddleware, roleMiddleware("student"));
 
-// POST /api/student/scan-attendance/scan
+// Route definition
 router.post("/scan", scanAttendance);
 
 module.exports = router;
