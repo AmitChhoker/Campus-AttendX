@@ -16,23 +16,29 @@ app.set('trust proxy', 1);
 const allowedOrigins = [
     "http://localhost:5173",
     "http://localhost:5174",
-    "https://campus-attendx-lyart.vercel.app" // <-- Aapka Exact Vercel URL
+    "https://campus-attendx-lyart.vercel.app" // Purana URL (optional)
 ];
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Postman ya mobile app ke liye (no origin)
+        // Postman / Mobile apps ke liye
         if (!origin) return callback(null, true);
         
-        // Localhost ya exact Vercel URL allow karein
-        if (origin.startsWith("http://localhost:") || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            console.log("Blocked by CORS:", origin); // Debugging ke liye
-            callback(new Error('Not allowed by CORS'));
+        // 1. Localhost allow karein
+        if (origin.startsWith("http://localhost:")) {
+            return callback(null, true);
         }
+
+        // 2. Koi bhi Vercel URL allow karein (Dynamic)
+        if (origin.includes("vercel.app") || allowedOrigins.indexOf(origin) !== -1) {
+            return callback(null, true);
+        }
+
+        // 3. Baaki sab block karein
+        console.log("Blocked by CORS:", origin);
+        callback(new Error('Not allowed by CORS'));
     },
-    credentials: true, // Cookies allow karne ke liye sabse zaroori
+    credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"]
 }));
