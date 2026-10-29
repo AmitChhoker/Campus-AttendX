@@ -1,15 +1,22 @@
 import axios from "axios";
 
-// Automatically use Localhost if running locally, Render if live
-const API_URL = import.meta.env.PROD 
-  ? "https://campus-attendx-backend.onrender.com/api" 
-  : "http://localhost:4000/api"; // <-- Apna backend port yahan daalein (4000)
-
 const client = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || "http://localhost:4000/api",
-    withCredentials: true, // <-- Cookies ke liye zaroori
-    headers: { "Content-Type": "application/json" },
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:4000/api",
+  withCredentials: true, // Cookies ke liye rakhein (backup)
+  headers: { "Content-Type": "application/json" },
 });
 
-// ... baaki interceptor code same rahega ...
+// 🔥 Request Interceptor: Har request ke saath Token bhejne ke liye
+client.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// ... baaki error interceptor code same rahega ...
 export default client;

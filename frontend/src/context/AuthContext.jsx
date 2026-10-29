@@ -25,17 +25,25 @@ const refresh = async () => {
     })();
   }, []);
 
-  const login = async (email, password) => {
-    await client.post("/auth/login", { emailId: email, password });
-    await refresh(); // User data fetch karne ke liye
+ // login function
+const login = async (email, password) => {
+    const res = await client.post("/auth/login", { emailId: email, password });
+    // 🔥 Token ko localStorage mein save karein
+    if (res.data.token) {
+        localStorage.setItem("token", res.data.token);
+    }
+    await refresh();
 };
 
-  const logout = async () => {
+// logout function
+const logout = async () => {
     try {
-      await client.post("/auth/logout");
-    } catch {}
+        await client.post("/auth/logout");
+    } catch (err) {}
+    // 🔥 Logout par token remove karein
+    localStorage.removeItem("token");
     setUser(null);
-  };
+};
 
   return (
     <AuthCtx.Provider value={{ user, loading, login, logout, refresh }}>

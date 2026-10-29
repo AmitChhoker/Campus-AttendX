@@ -12,22 +12,16 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
 
   const submit = async (e) => {
-    e.preventDefault(); // Page reload hone se rokne ke liye
+    e.preventDefault();
     setLoading(true);
-    
     try {
-      // Login API call
       await login(emailId, password);
-      
-      // Login successful! Ab page ko hard reload karo taaki nayi cookie set ho jaye
-      window.location.href = "/"; 
-      
+      window.location.href = "/"; // <-- Ye perfect hai
     } catch (error) {
-      // Agar backend error de (jaise galat password)
-      alert(error.response?.data?.message || "Login failed. Please check credentials.");
+      alert(error.response?.data?.message || "Login failed.");
       setLoading(false);
     }
-  };
+};
 
   return (
     <div className="auth-page">

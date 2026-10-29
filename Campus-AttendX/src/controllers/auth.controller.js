@@ -75,7 +75,7 @@ const login = async (req, res) => {
         res.cookie("token", accessToken, getCookieOptions(15 * 60 * 1000));
         res.cookie("refreshToken", refreshToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
         
-        res.json({ success: true, message: "Login successful" });
+        res.json({ success: true, message: "Login successful",token: accessToken });
     } catch (err) { 
         console.error("Login Error:", err.message);
         res.status(401).json({ success: false, message: err.message }); 
