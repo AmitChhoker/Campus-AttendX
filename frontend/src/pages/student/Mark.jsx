@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Html5Qrcode } from "html5-qrcode";
 import client from "../../api/client";
-import { QrCode, Bluetooth, ShieldCheck, Fingerprint, CheckCircle } from "lucide-react";
+import { QrCode, Bluetooth, ShieldCheck, Fingerprint, CheckCircle, AlertCircle } from "lucide-react";
 
-// Helper: Device Key generate/get karne ke liye
+// 1. Device Helpers
 const getStoredDevice = () => {
   let dev = localStorage.getItem("attendx_device");
   if (!dev) {
@@ -16,7 +16,7 @@ const getStoredDevice = () => {
   return JSON.parse(dev);
 };
 
-// Helper: HMAC Proof generate karne ke liye
+// 2. HMAC Proof Generator
 const generateProof = async (secret, prefix, challenge) => {
   const enc = new TextEncoder();
   const key = await window.crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
@@ -31,57 +31,79 @@ export default function StudentMark() {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
+  // Bind Device on Mount
   useEffect(() => {
-    const dev = getStoredDevice();
-    // Device bind karein taaki device verification pass ho
-    client.post("/student/device/bind", { deviceId: dev.deviceId, deviceKey: dev.deviceKey }).catch(() => {});
+    try {
+      const dev = getStoredDevice();
+      client.post("/student/device/bind", { deviceId: dev.deviceId, deviceKey: dev.deviceKey }).catch(() => {});
+    } catch (err) {
+      console.error("Device bind error", err);
+    }
   }, []);
 
   // QR Scan Logic
   useEffect(() => {
     if (!isScanning) return;
     
-    const scanner = new Html5Qrcode("reader");
-    scanner.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      (decodedText) => {
-        scanner.stop().then(() => {
-          try {
-            const parsed = JSON.parse(decodedText);
-            if (parsed.sessionId && parsed.window !== undefined && parsed.qrToken) {
-              setScannedData(parsed);
-              setIsScanning(false);
-              setStep(2); 
-            } else {
-              setError("Invalid QR format");
-              setIsScanning(false);
+    let scanner = null;
+    const startScanner = async () => {
+      try {
+        scanner = new Html5Qrcode("reader");
+        await scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText) => {
+            if (scanner) {
+              scanner.stop().then(() => {
+                try {
+                  const parsed = JSON.parse(decodedText);
+                  if (parsed.sessionId && parsed.window !== undefined && parsed.qrToken) {
+                    setScannedData(parsed);
+                    setIsScanning(false);
+                    setError("");
+                    setStep(2); // QR Scanned successfully
+                  } else {
+                    setError("Invalid QR format");
+                    setIsScanning(false);
+                  }
+                } catch (e) {
+                  setError("Invalid QR Code. Please scan the teacher's QR.");
+                  setIsScanning(false);
+                }
+              }).catch(console.error);
             }
-          } catch (e) {
-            setError("Invalid QR Code.");
-            setIsScanning(false);
-          }
-        });
-      },
-      () => {}
-    ).catch(() => setError("Camera access denied."));
+          },
+          () => {} // ignore scan errors
+        );
+      } catch (err) {
+        setError("Camera access denied or not found.");
+        setIsScanning(false);
+      }
+    };
 
-    return () => { scanner.stop().catch(() => {}); };
+    startScanner();
+
+    return () => {
+      if (scanner) {
+        scanner.stop().catch(() => {});
+      }
+    };
   }, [isScanning]);
 
-  // Final Submit Logic
+  // Final Submit
   const handleFinalSubmit = async () => {
     try {
+      setError("");
+      if (!scannedData) throw new Error("No QR data found. Please scan again.");
+      
       const dev = getStoredDevice();
       const challenge = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
       
-      // 1. Device Proof Generate karein
+      // Generate Proofs
       const deviceProof = await generateProof(dev.deviceKey, "device:", challenge);
-      
-      // 2. Fingerprint Proof Generate karein
       const fingerprintProof = await generateProof(dev.deviceKey, "fingerprint:", challenge);
 
-      // 3. Backend ko send karein
+      // Send to Backend
       await client.post("/student/mark-attendance", {
         sessionId: scannedData.sessionId,
         window: scannedData.window,
@@ -89,17 +111,15 @@ export default function StudentMark() {
         deviceId: dev.deviceId,
         deviceProof,
         fingerprintProof,
-        
-        // BLE abhi ke liye mock bhej rahe hain (Web browser BLE support nahi karta)
-        // Agar REQUIRE_BLE=true hai, toh backend isko check karega
-        bleRssi: -55 
+        bleRssi: -55 // Mock BLE signal
       });
 
       setStep(5); // Success
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to mark attendance");
+      setError(err.response?.data?.message || err.message || "Failed to mark attendance");
       setStep(1);
       setIsScanning(false);
+      setScannedData(null);
     }
   };
 
@@ -107,6 +127,7 @@ export default function StudentMark() {
     <div className="stack pb-20">
       <div className="page-head"><h2>Mark Attendance</h2></div>
 
+      {/* Progress Steps */}
       <div className="steps">
         {[1, 2, 3, 4].map((n) => (
           <div key={n} className={`step ${step >= n ? "active" : ""}`}>
@@ -115,8 +136,15 @@ export default function StudentMark() {
         ))}
       </div>
 
-      {error && <div className="error-box">{error}</div>}
+      {/* Error Message */}
+      {error && (
+        <div className="error-box flex items-center gap-2">
+          <AlertCircle size={20} />
+          <span>{error}</span>
+        </div>
+      )}
 
+      {/* STEP 1: QR SCAN */}
       {step === 1 && (
         <div className="card center-text">
           <h3 className="card-title">Step 1: QR Code Scan</h3>
@@ -124,7 +152,9 @@ export default function StudentMark() {
             <div style={{ padding: "2rem 1rem" }}>
               <QrCode size={64} className="mx-auto muted" />
               <p className="mt muted">Point at teacher's QR code.</p>
-              <button className="btn btn-primary mt" onClick={() => setIsScanning(true)}>📷 Start Camera</button>
+              <button className="btn btn-primary mt" onClick={() => { setError(""); setIsScanning(true); }}>
+                📷 Start Camera
+              </button>
             </div>
           ) : (
             <div>
@@ -135,17 +165,18 @@ export default function StudentMark() {
         </div>
       )}
 
-      {/* Baaki steps 2, 3, 4 waisa hi rahega */}
+      {/* STEP 2: BLE (Simulated) */}
       {step === 2 && (
         <div className="card center-text">
           <h3 className="card-title">Step 2: BLE Proximity</h3>
           <Bluetooth size={64} className="mx-auto text-indigo mt" />
           <p className="mt text-green-500 font-bold">✓ QR Verified</p>
-          <p className="muted">Checking device proximity...</p>
+          <p className="muted">Scanning for teacher's device...</p>
           <button className="btn btn-primary full mt" onClick={() => setStep(3)}>Confirm Proximity</button>
         </div>
       )}
 
+      {/* STEP 3: DEVICE */}
       {step === 3 && (
         <div className="card center-text">
           <h3 className="card-title">Step 3: Device Check</h3>
@@ -155,6 +186,7 @@ export default function StudentMark() {
         </div>
       )}
 
+      {/* STEP 4: FINGERPRINT */}
       {step === 4 && (
         <div className="card center-text">
           <h3 className="card-title">Step 4: Fingerprint</h3>
@@ -164,6 +196,7 @@ export default function StudentMark() {
         </div>
       )}
 
+      {/* STEP 5: SUCCESS */}
       {step === 5 && (
         <div className="card center-text">
           <CheckCircle size={64} className="mx-auto text-green-500" />
