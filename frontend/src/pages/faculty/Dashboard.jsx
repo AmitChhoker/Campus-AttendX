@@ -1,109 +1,95 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import client from "../../api/client";
-import Loader from "../../components/Loader";
-import { CalendarCheck, BookOpen, Plus, Play } from "lucide-react";
 
 export default function FacultyDashboard() {
-  const [sessions, setSessions] = useState([]);
+  const [activeSession, setActiveSession] = useState(null);
+  const [todayClasses, setTodayClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
-    try {
-      const [sess, subs] = await Promise.all([
-        client.get("/attendance-sessions/my-sessions"),
-        client.get("/subjects/my-submissions")
-      ]);
-      setSessions(sess.data.data || []);
-      setSubjects(subs.data.data || []);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    // Fetch Sessions and Subjects simultaneously
+    Promise.all([
+      client.get("/attendance-sessions/my-sessions"),
+      client.get("/subjects/my-submissions")
+    ]).then(([sessRes, subRes]) => {
+      const allSessions = sessRes.data.data || [];
+      
+      // 1. Find Active Session
+      const active = allSessions.find(s => s.status === "active");
+      setActiveSession(active);
 
-  useEffect(() => { load(); }, []);
+      // 2. Filter Today's Classes
+      const todayStr = new Date().toDateString();
+      const today = allSessions.filter(s => new Date(s.startedAt).toDateString() === todayStr);
+      setTodayClasses(today);
 
-  if (loading) return <Loader full />;
+      // 3. Get Approved Subjects
+      setSubjects((subRes.data.data || []).filter(s => s.status === "approved"));
+    }).catch(err => console.error(err))
+      .finally(() => setLoading(false));
+  }, []);
 
-  const active = sessions.find((s) => s.status === "active");
-  const today = sessions.filter((s) => {
-    const d = new Date(s.startedAt);
-    const now = new Date();
-    return d.toDateString() === now.toDateString();
-  });
+  if (loading) return <div className="loader-full">Loading...</div>;
 
-  const approved = subjects.filter((s) => s.status === "approved");
+  // Calculate total students present today (approximate based on available data)
+  const presentToday = todayClasses.reduce((acc, curr) => acc + (curr.presentCount || 0), 0);
 
   return (
     <div className="stack">
-      {active && (
-        <Link to={`/faculty/sessions/${active._id}`} className="card active-banner">
-          <span className="pulse" />
+      <div className="card">
+        <h3 className="card-title">TODAY'S OVERVIEW</h3>
+        <div className="stat-row">
+          <div className="stat-box"><h2>{todayClasses.length}</h2><p>Classes</p></div>
+          <div className="stat-box"><h2>{presentToday}</h2><p>Present</p></div>
+          <div className="stat-box live"><h2>{activeSession ? "Live" : "Offline"}</h2><p>Status</p></div>
+        </div>
+      </div>
+
+      {activeSession && (
+        <Link to={`/faculty/session/${activeSession._id}`} className="active-session-banner">
+          <span className="pulse-dot"></span>
           <div>
-            <strong>Active Session</strong>
-            <div className="muted small">
-              {active.subject?.subjectName} · {active.subject?.subjectCode}
-            </div>
+            <h3>{activeSession.subject?.subjectName} · Live Now</h3>
+            <p>Tap to resume live session →</p>
           </div>
-          <Play size={20} />
         </Link>
       )}
-      
-      {/* <Link to="/faculty/warnings" className="btn btn-danger">
-        ⚠️ Send Warning Reports
-      </Link> */}
-
-      <div className="grid grid-3">
-        <Stat icon={CalendarCheck} label="Today's Sessions" value={today.length} tone="indigo" />
-        <Stat icon={BookOpen} label="Approved Subjects" value={approved.length} tone="emerald" />
-        <Stat icon={Play} label="Total Sessions" value={sessions.length} tone="cyan" />
-      </div>
 
       <div className="card">
-        <div className="row-between">
-          <h3 className="card-title m-0">Quick Actions</h3>
-        </div>
-        <div className="row-gap mt">
-          <Link to="/faculty/subjects/new" className="btn btn-primary">
-            <Plus size={16} /> New Subject
-          </Link>
-          <Link to="/faculty/subjects" className="btn btn-ghost">
-            View My Subjects
-          </Link>
-        </div>
-      </div>
-
-      <div className="card">
-        <h3 className="card-title">Recent Sessions</h3>
+        <h3 className="card-title">TODAY'S CLASSES</h3>
         <ul className="list">
-          {sessions.slice(0, 5).map((s) => (
-            <li key={s._id} className="list-row">
-              <CalendarCheck size={16} className="tone-indigo" />
+          {todayClasses.length === 0 && <p className="muted center-text">No classes taken today.</p>}
+          {todayClasses.map(sess => (
+            <li key={sess._id} className="list-row">
               <div>
-                <strong>{s.subject?.subjectName}</strong>
-                <div className="muted small">
-                  {new Date(s.startedAt).toLocaleString()}
-                </div>
+                <strong>{sess.subject?.subjectName}</strong>
+                <span className="muted small"> · {new Date(sess.startedAt).toLocaleTimeString()}</span>
               </div>
-              <span className={`pill pill-${s.status}`}>{s.status}</span>
-              <Link className="btn btn-ghost sm" to={`/faculty/sessions/${s._id}`}>Open</Link>
+              <span className={`pill pill-${sess.status === 'active' ? 'approved' : 'pending'}`}>
+                {sess.status}
+              </span>
             </li>
           ))}
-          {sessions.length === 0 && <li className="muted">No sessions yet</li>}
         </ul>
       </div>
-    </div>
-  );
-}
 
-function Stat({ icon: Icon, label, value, tone }) {
-  return (
-    <div className={`card stat stat-${tone}`}>
-      <Icon size={22} />
-      <div>
-        <div className="stat-value">{value}</div>
-        <div className="stat-label">{label}</div>
+      <Link to="/faculty/session/start" className="btn btn-primary full big">
+        + START NEW SESSION
+      </Link>
+
+      <div className="card">
+        <h3 className="card-title">YOUR COURSES [{subjects.length}]</h3>
+        {subjects.length === 0 && <p className="muted center-text">No approved subjects yet.</p>}
+        <div className="grid grid-2 mt">
+          {subjects.slice(0, 4).map(sub => (
+            <Link to="/faculty/courses" key={sub._id} className="course-card block" style={{ background: 'var(--surface-2)', padding: '1rem', borderRadius: '8px', textDecoration: 'none', color: 'inherit' }}>
+              <h4 className="m-0">🎓 {sub.subjectName}</h4>
+              <p className="small muted mt">{sub.branch} · Sem {sub.semester}</p>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );

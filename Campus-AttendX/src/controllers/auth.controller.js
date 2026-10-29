@@ -3,20 +3,17 @@ const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const redisClient = require("../config/redis");
+const Otp = require("../models/Otp");
+const { sendSms } = require("../utils/sms");
 
-// =====================================================
-// COOKIE OPTIONS FOR PRODUCTION (Cross-Domain)
-// =====================================================
+// Helper function (Ab logout aur refresh token dono mein kaam aayega)
 const getCookieOptions = (maxAge) => ({
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production", // Render par true
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // Cross-domain ke liye
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     maxAge
 });
 
-// =====================================================
-// REGISTER
-// =====================================================
 const register = async (req, res) => {
     try {
         validUser(req.body);
@@ -44,59 +41,47 @@ const register = async (req, res) => {
             const duplicateField = Object.keys(err.keyPattern || {})[0] || "Field";
             return res.status(409).json({ success: false, message: `${duplicateField} already exists. Please use a different one.` });
         }
-        if (err.name === "ValidationError") {
-            return res.status(400).json({ success: false, message: err.message });
-        }
-        console.error("Register error:", err);
         return res.status(400).json({ success: false, message: err.message });
     }
 };
 
-// =====================================================
-// LOGIN
-// =====================================================
 const login = async (req, res) => {
     try {
         const { emailId, password } = req.body;
-        if (!emailId || !password) {
-            return res.status(400).json({ success: false, message: "Email and password are required" });
-        }
-
+        
         const user = await User.findOne({ emailId: emailId.toLowerCase().trim() });
-
-        if (!user) return res.status(401).json({ success: false, message: "Invalid credentials" });
-        if (!user.isActive) return res.status(403).json({ success: false, message: "Your account is inactive. Please contact the administrator." });
-
+        if (!user) throw new Error("User not found. Please register first.");
+        
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(401).json({ success: false, message: "Invalid credentials" });
+        if (!isMatch) throw new Error("Invalid password");
+        
+        if (!user.isActive) throw new Error("Account is inactive");
 
         const accessToken = jwt.sign(
-            { _id: user._id, emailId: user.emailId, role: user.role, adminBranch: user.role === "admin" ? user.adminBranch : null },
-            process.env.JWT_SECRET_KEY,
+            { _id: user._id, role: user.role, adminBranch: user.adminBranch }, 
+            process.env.JWT_SECRET_KEY, 
             { expiresIn: "15m" }
         );
-
-        const refreshToken = jwt.sign({ _id: user._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: "7d" });
+        
+        const refreshToken = jwt.sign(
+            { _id: user._id }, 
+            process.env.JWT_REFRESH_SECRET, 
+            { expiresIn: "7d" }
+        );
 
         await redisClient.set(`refreshToken:${user._id}`, refreshToken, { EX: 7 * 24 * 60 * 60 });
 
-        user.lastLogin = new Date();
-        await user.save();
-
-        // Apply Production Cookie Options
+        // Cookie set karna
         res.cookie("token", accessToken, getCookieOptions(15 * 60 * 1000));
         res.cookie("refreshToken", refreshToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
-
-        return res.status(200).json({ success: true, message: "User login successful" });
-    } catch (err) {
-        console.error("Login error:", err);
-        return res.status(500).json({ success: false, message: "Internal server error" });
+        
+        res.json({ success: true, message: "Login successful" });
+    } catch (err) { 
+        console.error("Login Error:", err.message);
+        res.status(401).json({ success: false, message: err.message }); 
     }
 };
 
-// =====================================================
-// LOGOUT
-// =====================================================
 const logout = async (req, res) => {
     try {
         const { token, refreshToken: storedRefreshToken } = req.cookies || {};
@@ -115,21 +100,16 @@ const logout = async (req, res) => {
             } catch (err) { }
         }
 
-        // Clear cookies with same production options
-        const clearOptions = getCookieOptions(0);
-        res.clearCookie("token", clearOptions);
-        res.clearCookie("refreshToken", clearOptions);
+        // Clear cookies
+        res.clearCookie("token", getCookieOptions(0));
+        res.clearCookie("refreshToken", getCookieOptions(0));
 
         return res.status(200).json({ success: true, message: "User logout successful" });
     } catch (err) {
-        console.error("Logout error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
     }
 };
 
-// =====================================================
-// GET CURRENT USER
-// =====================================================
 const me = async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select("-password");
@@ -140,9 +120,6 @@ const me = async (req, res) => {
     }
 };
 
-// =====================================================
-// REFRESH ACCESS TOKEN
-// =====================================================
 const refreshToken = async (req, res) => {
     try {
         const { refreshToken: storedRefreshToken } = req.cookies || {};
@@ -164,7 +141,6 @@ const refreshToken = async (req, res) => {
             { expiresIn: "15m" }
         );
 
-        // Apply Production Cookie Options
         res.cookie("token", newAccessToken, getCookieOptions(15 * 60 * 1000));
 
         return res.status(200).json({ success: true, message: "Access token refreshed successfully" });
@@ -173,9 +149,6 @@ const refreshToken = async (req, res) => {
     }
 };
 
-// =====================================================
-// CHANGE PASSWORD
-// =====================================================
 const changePassword = async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
@@ -201,11 +174,42 @@ const changePassword = async (req, res) => {
     }
 };
 
+const sendOtp = async (req, res) => {
+    try {
+        const { phone } = req.body;
+        const user = await User.findOne({ phone });
+        if (!user) return res.status(404).json({ success: false, message: "No account found with this phone number" });
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        await Otp.deleteMany({ phone });
+        await Otp.create({ phone, otp });
+        await sendSms(phone, `Your AttendX password reset OTP is ${otp}`);
+        
+        res.json({ success: true, message: "OTP sent successfully to your phone." });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+const resetPasswordWithOtp = async (req, res) => {
+    try {
+        const { phone, otp, newPassword } = req.body;
+        const otpRecord = await Otp.findOne({ phone, otp });
+        if (!otpRecord) return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
+
+        const user = await User.findOne({ phone });
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+        user.password = await bcrypt.hash(newPassword, 10);
+        await user.save();
+        await Otp.deleteOne({ _id: otpRecord._id });
+
+        res.json({ success: true, message: "Password reset successfully. Please login." });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 module.exports = {
-    register,
-    login,
-    logout,
-    me,
-    refreshToken,
-    changePassword
+    register, login, logout, me, refreshToken, changePassword, sendOtp, resetPasswordWithOtp 
 };

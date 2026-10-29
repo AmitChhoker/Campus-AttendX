@@ -6,13 +6,14 @@ const Attendance = require("../models/Attendance");
 const User = require("../models/User");
 
 const { generateBlePayload } = require("../utils/dynamicBle");
+const { generateDynamicQrPayload } = require("../utils/dynamicQr"); // <-- QR Generator import kiya
 
 // ==========================================
 // SESSION CONFIG
 // ==========================================
 
-const SESSION_DURATION = 5 * 60 * 1000;
-const QR_DURATION = 30 * 1000; // matches dynamicQr.js window
+const SESSION_DURATION = 5 * 60 * 1000; // 5 mins
+const QR_DURATION = 30 * 1000; // 30 seconds
 
 // ==========================================
 // CREATE ATTENDANCE SESSION
@@ -23,10 +24,11 @@ const createAttendanceSession = async ({ facultyId, subjectId }) => {
         throw new Error("A valid subjectId is required");
     }
 
+    // 1. Verify Subject is Approved
     const subject = await Subject.findOne({
         _id: subjectId,
         submittedBy: facultyId,
-        status: "approved",
+        status: "approved", // Sirf approved subject hi session start kar sakta hai
         isActive: true
     });
 
@@ -34,6 +36,8 @@ const createAttendanceSession = async ({ facultyId, subjectId }) => {
         throw new Error("Approved subject not found or you are not authorized");
     }
 
+    // 2. Prevent multiple sessions within 1 hour (Testing ke liye abhi isko band rakha hai)
+    /*
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
     const recentSession = await AttendanceSession.findOne({
         subject: subjectId,
@@ -44,6 +48,7 @@ const createAttendanceSession = async ({ facultyId, subjectId }) => {
     if (recentSession) {
         throw new Error("You already conducted attendance for this subject within the last hour");
     }
+    */
 
     const startedAt = new Date();
     const expiresAt = new Date(startedAt.getTime() + SESSION_DURATION);
@@ -51,6 +56,7 @@ const createAttendanceSession = async ({ facultyId, subjectId }) => {
     const sessionCode = crypto.randomBytes(32).toString("hex");
     const bleSecret = crypto.randomBytes(32).toString("hex");
 
+    // 3. Create Session
     const session = await AttendanceSession.create({
         subject: subject._id,
         faculty: facultyId,
@@ -75,7 +81,8 @@ const createAttendanceSession = async ({ facultyId, subjectId }) => {
 
 const getMySessions = async (facultyId) => {
     return AttendanceSession.find({ faculty: facultyId })
-        .populate("subject", "subjectName subjectCode course branch semester")
+        // Yahan credits, type aur totalPlannedClasses add kiya
+        .populate("subject", "subjectName subjectCode course branch semester credits type totalPlannedClasses") 
         .sort({ createdAt: -1 });
 };
 
@@ -94,6 +101,22 @@ const getAttendanceSessionById = async ({ sessionId, facultyId }) => {
 };
 
 // ==========================================
+// GET QR PAYLOAD FOR ACTIVE SESSION (NAYA ADD KIYA)
+// ==========================================
+
+const getSessionQrPayload = async ({ sessionId, facultyId }) => {
+    const session = await AttendanceSession.findOne({
+        _id: sessionId,
+        faculty: facultyId
+    });
+
+    if (!session) throw new Error("Attendance session not found");
+    if (session.status !== "active") throw new Error("Session is not active");
+
+    return generateDynamicQrPayload(session._id);
+};
+
+// ==========================================
 // GET BLE PAYLOAD FOR ACTIVE SESSION
 // ==========================================
 
@@ -104,13 +127,10 @@ const getSessionBlePayload = async ({ sessionId, facultyId }) => {
     }).select("+bleSecret");
 
     if (!session) throw new Error("Attendance session not found");
-
-    if (session.status !== "active") {
-        throw new Error("Session is not active");
-    }
+    if (session.status !== "active") throw new Error("Session is not active");
 
     if (!session.bleSecret) {
-        throw new Error("BLE secret not configured for this session (legacy session)");
+        throw new Error("BLE secret not configured for this session");
     }
 
     return generateBlePayload(session._id, session.bleSecret);
@@ -134,13 +154,12 @@ const closeAttendanceSession = async ({ sessionId, facultyId }) => {
     session.status = "closed";
     session.closedAt = new Date();
     await session.save();
+    
     return session;
 };
 
 // ==========================================
 // STUDENT MARKS ATTENDANCE (LEGACY)
-// Kept for backward compatibility with older clients; new clients
-// should use POST /api/student/scan-attendance/scan.
 // ==========================================
 
 const markAttendance = async ({ sessionId, studentId }) => {
@@ -299,12 +318,9 @@ const deleteAttendanceRecord = async ({ sessionId, studentId, facultyId }) => {
 
     if (!session) throw new Error("Attendance session not found");
 
-    // 2-day window
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
     if (new Date(session.startedAt) < twoDaysAgo) {
-        throw new Error(
-            "Attendance can only be deleted within 2 days of the session"
-        );
+        throw new Error("Attendance can only be deleted within 2 days of the session");
     }
 
     const record = await Attendance.findOneAndDelete({
@@ -316,6 +332,7 @@ const deleteAttendanceRecord = async ({ sessionId, studentId, facultyId }) => {
 
     return { removed: true, attendanceId: record._id };
 };
+
 
 // ==========================================
 // MONTHLY REPORT
@@ -356,9 +373,7 @@ const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year })
 
     if (startDate > now) throw new Error("Future month attendance report is not available");
     if (now < endDate) {
-        throw new Error(
-            "Monthly attendance report is available only after the selected month has been completed"
-        );
+        throw new Error("Monthly attendance report is available only after the selected month has been completed");
     }
 
     const sessions = await AttendanceSession.find({
@@ -396,16 +411,8 @@ const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year })
             totalClassesConducted: 0,
             totalStudents: students.length,
             studentsBelow75: 0,
-            students: students.map((s) => ({
-                studentId: s._id,
-                name: `${s.firstName} ${s.lastName}`,
-                registrationNumber: s.registrationNumber,
-                classesConducted: 0,
-                present: 0,
-                absent: 0,
-                attendancePercentage: null,
-                below75: false
-            }))
+             students: []
+            // 
         };
     }
 
@@ -508,6 +515,7 @@ module.exports = {
     createAttendanceSession,
     getMySessions,
     getAttendanceSessionById,
+    getSessionQrPayload, // <-- Ye add kiya
     getSessionBlePayload,
     closeAttendanceSession,
     markAttendance,

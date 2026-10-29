@@ -16,7 +16,8 @@ app.use(express.json());
 // ==========================================
 const allowedOrigins = [
     "http://localhost:5173",
-    "https://campus-attendx-lyart.vercel.app" // Aapka Vercel URL
+    "http://localhost:5174", // <-- Ye line add karein
+    "https://campus-attendx-lyart.vercel.app"
 ];
 
 app.use(cors({
@@ -24,7 +25,8 @@ app.use(cors({
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
         
-        if (allowedOrigins.indexOf(origin) !== -1) {
+        // Allow any localhost port for local development
+        if (origin.startsWith("http://localhost:") || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
@@ -74,6 +76,7 @@ const studentNotificationRouter = require("./src/routes/student/studentNotificat
 const studentSettingsRouter = require("./src/routes/student/studentSettings.routes");
 const studentScanAttendanceRouter = require("./src/routes/student/studentScanAttendance.routes");
 const studentDeviceRouter = require("./src/routes/student/studentDevice.routes");
+const studentRoutes = require("./src/routes/student/student.routes"); 
 
 const { startAttendanceCron } = require("./src/cron/attendanceWarning.cron");
 
@@ -82,7 +85,7 @@ const { startAttendanceCron } = require("./src/cron/attendanceWarning.cron");
 // ==========================================
 // Public
 app.use("/api/recovery", recoveryRouter);
-app.use("/api", authRouter);
+app.use("/api/auth", authRouter);
 
 // Faculty
 app.use("/api/subjects", subjectRouter);
@@ -110,6 +113,7 @@ app.use("/api/student/notifications", studentNotificationRouter);
 app.use("/api/student/settings", studentSettingsRouter);
 app.use("/api/student/scan-attendance", studentScanAttendanceRouter);
 app.use("/api/student/device", studentDeviceRouter);
+app.use("/api/student", studentRoutes); 
 
 // ==========================================
 // HEALTH CHECK ROUTE

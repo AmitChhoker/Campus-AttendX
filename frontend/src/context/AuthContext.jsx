@@ -8,16 +8,15 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const refresh = async () => {
+  // AuthContext.jsx mein ye hona chahiye
+const refresh = async () => {
     try {
-      const res = await client.get("/auth/me");
-      setUser(res.data.user);
-      return res.data.user;
-    } catch {
-      setUser(null);
-      return null;
+        const res = await client.get("/auth/me");
+        setUser(res.data.user);
+    } catch (err) {
+        setUser(null);
     }
-  };
+};
 
   useEffect(() => {
     (async () => {

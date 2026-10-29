@@ -6,8 +6,9 @@ import { GraduationCap, Mail, Lock } from "lucide-react";
 
 export default function Login() {
   const { login } = useAuth();
-  const { error } = useToast();
+  const { error: toastError } = useToast(); // Rename to avoid conflict
   const navigate = useNavigate();
+  
   const [emailId, setEmailId] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,11 +17,11 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      const user = await login(emailId.trim().toLowerCase(), password);
-      if (!user) throw new Error("Login failed");
-      navigate(`/${user.role}`);
-    } catch (err) {
-      error(err.response?.data?.message || err.message || "Login failed");
+      // Yahan emailId aur password pass karna hai
+      await login(emailId, password); 
+      navigate("/");
+    } catch (error) {
+      alert(error.response?.data?.message || "Login failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -65,12 +66,11 @@ export default function Login() {
             </div>
           </label>
 
-          <button className="btn btn-primary full" disabled={loading}>
+          <button type="submit" className="btn btn-primary full" disabled={loading}>
             {loading ? "Signing in…" : "Sign In"}
           </button>
         </form>
         
-        {/* Yahan Register Link add kiya gaya hai */}
         <div className="auth-foot" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <Link to="/recover">Forgot password?</Link>
           <div>

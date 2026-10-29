@@ -575,3 +575,195 @@ p  { margin: 0.25rem 0; }
   .mobile-only { display: grid; }
   .content { padding: 1.25rem 1rem; }
 }
+/* ================================
+   NEW DASHBOARD SPECIFIC STYLES
+   ================================ */
+
+/* Admin System Overview */
+.stat-row {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+.stat-box {
+  background: var(--surface-2);
+  padding: 1rem;
+  border-radius: var(--radius-sm);
+  min-width: 100px;
+  text-align: center;
+  flex: 1;
+}
+.stat-box h2 { margin: 0; font-size: 1.8rem; color: var(--indigo-600); }
+.stat-box p { margin: 0; font-size: 0.8rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
+.stat-box.live { background: #ecfdf5; }
+.stat-box.live h2 { color: var(--emerald); }
+
+/* Activity List */
+.activity-list { list-style: none; padding: 0; margin: 0; }
+.activity-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+.dot { width: 8px; height: 8px; background: var(--indigo); border-radius: 50%; display: inline-block; }
+
+/* Teacher Active Banner */
+.active-session-banner {
+  background: #ecfdf5;
+  border: 1px solid var(--emerald);
+  border-radius: var(--radius);
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  text-decoration: none;
+  color: inherit;
+}
+.pulse-dot {
+  width: 12px; height: 12px;
+  background: var(--emerald);
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* Student Hero Card */
+.hero-card {
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  text-align: center;
+  border: 1px solid var(--border);
+}
+.hero-card.safe { background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 100%); }
+.hero-card.risk { background: linear-gradient(180deg, #fef2f2 0%, #ffffff 100%); }
+.hero-percent { font-size: 3.5rem; font-weight: 800; margin: 0.5rem 0; letter-spacing: -2px; }
+.hero-card.risk .hero-percent { color: var(--red); }
+.hero-card.safe .hero-percent { color: var(--emerald); }
+
+/* Student Bottom Tabs */
+.bottom-tabs {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-around;
+  padding: 0.5rem 0;
+  z-index: 100;
+}
+.bottom-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.bottom-tab.active { color: var(--indigo); }
+.pb-20 { padding-bottom: 70px; }
+@media (min-width: 769px) { .bottom-tabs { display: none; } .pb-20 { padding-bottom: 0; } }
+
+/* Subject Cards (Student) */
+.subject-card {
+  padding: 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border-left: 4px solid var(--border);
+}
+.subject-card.safe { border-left-color: var(--emerald); }
+.subject-card.risk { border-left-color: var(--red); }
+/* ================================
+   DOCUMENT EXACT MATCH STYLES
+   ================================ */
+
+.hero-card {
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  text-align: center;
+}
+.hero-card.safe { background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 100%); }
+.hero-card.risk { background: linear-gradient(180deg, #fef2f2 0%, #ffffff 100%); }
+.hero-percent { font-size: 4rem; font-weight: 800; margin: 0; line-height: 1; }
+.hero-card.safe .hero-percent { color: var(--emerald); }
+.hero-card.risk .hero-percent { color: var(--red); }
+
+.subject-card {
+  padding: 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border-left: 4px solid var(--border);
+}
+.subject-card.safe { border-left-color: var(--emerald); }
+.subject-card.risk { border-left-color: var(--red); }
+
+/* Admin Stat Boxes */
+.stat-row {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+}
+.stat-box {
+  background: var(--surface-2);
+  padding: 1rem;
+  border-radius: var(--radius-sm);
+  min-width: 90px;
+  text-align: center;
+  flex: 1;
+}
+.stat-box h2 { margin: 0; font-size: 1.8rem; color: var(--indigo); }
+.stat-box p { margin: 0; font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
+.stat-box.live { background: #ecfdf5; }
+.stat-box.live h2 { color: var(--emerald); }
+
+/* Teacher Active Banner */
+.active-session-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: #ecfdf5;
+  border: 1px solid var(--emerald);
+  padding: 1rem;
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+}
+.pulse-dot {
+  width: 12px; height: 12px;
+  background: var(--emerald);
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+/* Activity List */
+.activity-list { list-style: none; padding: 0; margin: 0; }
+.activity-list li { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; font-size: 0.9rem; border-bottom: 1px solid var(--border); }
+.dot { width: 8px; height: 8px; background: var(--indigo); border-radius: 50%; display: inline-block; }
+
+/* Bottom Tabs (Mobile Student Nav) */
+.bottom-tabs {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--surface); border-top: 1px solid var(--border);
+  display: flex; justify-content: space-around; padding: 0.5rem 0; z-index: 100;
+}
+.bottom-tab { display: flex; flex-direction: column; align-items: center; text-decoration: none; color: var(--text-muted); font-size: 0.75rem; font-weight: 600; }
+.bottom-tab.active { color: var(--indigo); }
+.pb-20 { padding-bottom: 80px; }
+
+/* Simple utility */
+.row-between { display: flex; justify-content: space-between; align-items: center; }
+.row-gap { display: flex; gap: 0.5rem; }
+.mt { margin-top: 1rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.full { width: 100%; }
+.big { padding: 1rem; font-size: 1rem; }
+.block { display: block; }

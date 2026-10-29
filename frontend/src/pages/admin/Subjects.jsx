@@ -1,101 +1,85 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
 import client from "../../api/client";
-import Loader from "../../components/Loader";
 import { useToast } from "../../context/ToastContext";
 
-const FILTERS = [
-  { key: "", label: "All" },
-  { key: "pending", label: "Pending" },
-  { key: "approved", label: "Approved" },
-  { key: "rejected", label: "Rejected" }
-];
-
 export default function AdminSubjects() {
-  const [sp, setSp] = useSearchParams();
-  const [status, setStatus] = useState(sp.get("status") || "");
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
   const { success, error } = useToast();
+  const [subjects, setSubjects] = useState([]);
+  const [activeTab, setActiveTab] = useState("pending");
 
-  const load = async () => {
-    setLoading(true);
+  const loadSubjects = () => {
+    client.get("/admin/subjects").then(r => {
+      setSubjects(r.data.data || []);
+    });
+  };
+
+  useEffect(() => { loadSubjects(); }, []);
+
+  const handleApprove = async (id) => {
     try {
-      const r = await client.get("/admin/subjects", {
-        params: status ? { status } : {}
-      });
-      setRows(r.data.data || []);
-    } catch (e) {
-      error(e.response?.data?.message || "Failed");
-    } finally {
-      setLoading(false);
+      await client.patch(`/admin/subjects/${id}/approve`);
+      success("Subject approved successfully!");
+      loadSubjects();
+    } catch (err) {
+      error("Failed to approve");
     }
   };
 
-  useEffect(() => { load(); }, [status]);
-
-  const act = async (id, action) => {
+  const handleReject = async (id) => {
+    const reason = prompt("Enter rejection reason:");
+    if (!reason) return;
     try {
-      if (action === "approve") {
-        await client.patch(`/admin/subjects/${id}/approve`);
-        success("Approved");
-      } else {
-        const reason = prompt("Rejection reason:");
-        if (!reason) return;
-        await client.patch(`/admin/subjects/${id}/reject`, { reason });
-        success("Rejected");
-      }
-      load();
-    } catch (e) {
-      error(e.response?.data?.message || "Failed");
+      await client.patch(`/admin/subjects/${id}/reject`, { reason });
+      success("Subject rejected");
+      loadSubjects();
+    } catch (err) {
+      error("Failed to reject");
     }
   };
+
+  const filtered = subjects.filter(s => s.status === activeTab);
 
   return (
     <div className="stack">
       <div className="page-head">
-        <h2>Subjects</h2>
-      </div>
-      <div className="tabs">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            className={`tab ${status === f.key ? "active" : ""}`}
-            onClick={() => { setStatus(f.key); setSp(f.key ? { status: f.key } : {}); }}
-          >
-            {f.label}
-          </button>
-        ))}
+        <h2>Subject Approvals</h2>
       </div>
 
-      {loading ? <Loader /> : (
-        <div className="grid grid-2">
-          {rows.map((s) => (
-            <div key={s._id} className="card">
-              <div className="row-between">
-                <div>
-                  <h3 className="m-0">{s.subjectName}</h3>
-                  <p className="muted small">{s.subjectCode} · {s.course} · {s.branch} · Sem {s.semester}</p>
-                </div>
-                <span className={`pill pill-${s.status}`}>{s.status}</span>
-              </div>
-              <p className="small muted mt">
-                Submitted by {s.submittedBy?.firstName} {s.submittedBy?.lastName}
-              </p>
-              <div className="row-gap mt">
-                <Link className="btn btn-ghost sm" to={`/admin/subjects/${s._id}`}>View</Link>
-                {s.status === "pending" && (
-                  <>
-                    <button className="btn btn-primary sm" onClick={() => act(s._id, "approve")}>Approve</button>
-                    <button className="btn btn-danger sm" onClick={() => act(s._id, "reject")}>Reject</button>
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
-          {rows.length === 0 && <div className="muted center">No subjects</div>}
+      <div className="tabs">
+        <button className={`tab ${activeTab === "pending" ? "active" : ""}`} onClick={() => setActiveTab("pending")}>Pending</button>
+        <button className={`tab ${activeTab === "approved" ? "active" : ""}`} onClick={() => setActiveTab("approved")}>Approved</button>
+        <button className={`tab ${activeTab === "rejected" ? "active" : ""}`} onClick={() => setActiveTab("rejected")}>Rejected</button>
+      </div>
+
+      {filtered.length === 0 && (
+        <div className="card center-text">
+          <p className="muted">No {activeTab} subjects found.</p>
         </div>
       )}
+
+      <div className="grid grid-2">
+        {filtered.map(sub => (
+          <div key={sub._id} className="card">
+            <h3>{sub.subjectName} ({sub.subjectCode})</h3>
+            <p className="small muted">Faculty: {sub.submittedBy?.firstName} {sub.submittedBy?.lastName}</p>
+            <p className="small muted">{sub.course} · {sub.branch} · Sem {sub.semester}</p>
+            
+            {/* Syllabus Link */}
+            {sub.syllabus?.fileUrl && (
+              <a href={sub.syllabus.fileUrl} target="_blank" rel="noreferrer" className="small text-indigo mt block">
+                📄 View Syllabus PDF
+              </a>
+            )}
+
+            {activeTab === "pending" && (
+              <div className="row-gap mt">
+                <button className="btn btn-primary sm" onClick={() => handleApprove(sub._id)}>Approve</button>
+                <button className="btn btn-danger sm" onClick={() => handleReject(sub._id)}>Reject</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -2,7 +2,9 @@
   "dependencies": {
     "cors": "^2.8.6",
     "googleapis": "^187.0.0",
+    "html5-qrcode": "^2.3.8",
     "node-cron": "^4.6.0",
-    "nodemailer": "^10.2.0"
+    "nodemailer": "^10.2.0",
+    "qrcode.react": "^4.2.0"
   }
 }

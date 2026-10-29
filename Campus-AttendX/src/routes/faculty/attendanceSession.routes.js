@@ -4,18 +4,25 @@ const router = express.Router();
 const authMiddleware = require("../../middleware/authMiddleware");
 const roleMiddleware = require("../../middleware/role.middleware");
 
+// Saare controllers ek hi jagah se import karein (No Duplicates)
 const {
     createAttendanceSession,
     getMySessions,
     getAttendanceSessionById,
+    getSessionQrPayload,
     getSessionBlePayload,
     getAttendanceSummary,
     closeAttendanceSession,
     markAttendance,
     deleteAttendanceRecord,
     getMonthlyAttendanceReport,
-    downloadMonthlyAttendanceReport
+    downloadMonthlyAttendanceReport,
+    sendWarnings
 } = require("../../controllers/faculty/attendanceSession.controller");
+
+// ==========================================
+// Faculty Routes
+// ==========================================
 
 // Create session
 router.post(
@@ -33,7 +40,9 @@ router.get(
     getMySessions
 );
 
-// Reports (registered before /:id)
+// ==========================================
+// Reports & Warnings (Always above /:id)
+// ==========================================
 router.get(
     "/reports/monthly",
     authMiddleware,
@@ -48,39 +57,21 @@ router.get(
     downloadMonthlyAttendanceReport
 );
 
-// QR + BLE payloads
+router.post(
+    "/reports/send-bulk",
+    authMiddleware,
+    roleMiddleware("faculty"),
+    sendWarnings
+);
+
+// ==========================================
+// Session Specific Routes
+// ==========================================
 router.get(
     "/:id/qr",
     authMiddleware,
     roleMiddleware("faculty"),
-    (req, res, next) => {
-        // Delegates to generateDynamicQrPayload — inlined here to keep
-        // the route simple. Uses dynamicQr util.
-        const { generateDynamicQrPayload } = require("../../utils/dynamicQr");
-        const AttendanceSession = require("../../models/AttendanceSession");
-
-        AttendanceSession.findOne({
-            _id: req.params.id,
-            faculty: req.user.id
-        }).then((session) => {
-            if (!session) {
-                return res.status(404).json({
-                    success: false,
-                    message: "Session not found"
-                });
-            }
-            if (session.status !== "active") {
-                return res.status(400).json({
-                    success: false,
-                    message: "Session is not active"
-                });
-            }
-            return res.status(200).json({
-                success: true,
-                data: generateDynamicQrPayload(session._id)
-            });
-        }).catch(next);
-    }
+    getSessionQrPayload
 );
 
 router.get(
@@ -90,7 +81,6 @@ router.get(
     getSessionBlePayload
 );
 
-// Summary
 router.get(
     "/:id/summary",
     authMiddleware,
@@ -98,7 +88,6 @@ router.get(
     getAttendanceSummary
 );
 
-// Get one
 router.get(
     "/:id",
     authMiddleware,
@@ -106,7 +95,6 @@ router.get(
     getAttendanceSessionById
 );
 
-// Close
 router.patch(
     "/:id/close",
     authMiddleware,
@@ -114,7 +102,6 @@ router.patch(
     closeAttendanceSession
 );
 
-// Delete one student's attendance
 router.delete(
     "/:id/attendance/:studentId",
     authMiddleware,
@@ -122,7 +109,7 @@ router.delete(
     deleteAttendanceRecord
 );
 
-// Legacy student mark (kept for backward compat)
+// Legacy student mark
 router.post(
     "/:id/mark",
     authMiddleware,

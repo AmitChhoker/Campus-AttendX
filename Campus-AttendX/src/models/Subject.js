@@ -94,7 +94,17 @@ const subjectSchema = new Schema(
         isActive: {
             type: Boolean,
             default: true
-        }
+        },
+        // Subject.js mein baaki fields ke saath ye add karein
+        credits: { 
+            type: Number, required: true 
+        },
+        type: { 
+            type: String, enum: ["theory", "lab"], required: true 
+        },
+        totalPlannedClasses: { 
+            type: Number, required: true, default: 40 
+        }, // <-- Naya field
     },
     { timestamps: true }
 );

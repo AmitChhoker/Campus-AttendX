@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import client from "../../api/client";
 import Loader from "../../components/Loader";
 import Modal from "../../components/Modal";
@@ -8,14 +8,15 @@ import { Plus } from "lucide-react";
 
 export default function FacultySessions() {
   const { success, error } = useToast();
+  const navigate = useNavigate();
+  
   const [sessions, setSessions] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showStart, setShowStart] = useState(false);
   const [subjectId, setSubjectId] = useState("");
 
-  // frontend/src/pages/faculty/Sessions.jsx ke andar
-const load = async () => {
+  const load = async () => {
     try {
       const [a, b] = await Promise.all([
         client.get("/attendance-sessions/my-sessions"),
@@ -23,12 +24,16 @@ const load = async () => {
       ]);
       setSessions(a.data.data || []);
       
-      // Ye line check karti hai ki subject approved hai ya nahi
-      setSubjects((b.data.data || []).filter((s) => s.status === "approved"));
+      // Yahan humne filter lagaya hai ki sirf Approved subjects hi dikhein
+      const approvedSubjects = (b.data.data || []).filter((s) => s.status === "approved");
+      setSubjects(approvedSubjects);
+      
+    } catch (err) {
+      error("Failed to load data");
     } finally {
       setLoading(false);
     }
-};
+  };
 
   useEffect(() => { load(); }, []);
 
@@ -36,11 +41,12 @@ const load = async () => {
     if (!subjectId) return error("Select a subject");
     try {
       const r = await client.post("/attendance-sessions", { subjectId });
-      success("Session started");
+      success("Session started!");
       setShowStart(false);
-      load();
+      // Start hote hi direct QR screen par bhej dein
+      navigate(`/faculty/session/${r.data.data.session._id}`);
     } catch (err) {
-      error(err.response?.data?.message || "Failed");
+      error(err.response?.data?.message || "Failed to start session");
     }
   };
 
@@ -65,7 +71,7 @@ const load = async () => {
                 <td className="muted small">{new Date(s.startedAt).toLocaleString()}</td>
                 <td><span className={`pill pill-${s.status}`}>{s.status}</span></td>
                 <td>
-                  <Link className="btn btn-ghost sm" to={`/faculty/sessions/${s._id}`}>Open</Link>
+                  <Link className="btn btn-ghost sm" to={`/faculty/session/${s._id}`}>Open</Link>
                 </td>
               </tr>
             ))}
@@ -78,10 +84,13 @@ const load = async () => {
 
       <Modal open={showStart} onClose={() => setShowStart(false)} title="Start New Session">
         {subjects.length === 0 ? (
-          <p className="muted">You have no approved subjects. Submit one first.</p>
+          <div className="center-text">
+            <p className="muted">You have no approved subjects.</p>
+            <Link to="/faculty/subjects" className="btn btn-primary mt">Go to Subjects</Link>
+          </div>
         ) : (
           <>
-            <label className="field"><span>Select Subject</span>
+            <label className="field"><span>Select Approved Subject</span>
               <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
                 <option value="">— pick a subject —</option>
                 {subjects.map((s) => (
@@ -91,7 +100,7 @@ const load = async () => {
                 ))}
               </select>
             </label>
-            <button className="btn btn-primary mt" onClick={startSession}>Start Session</button>
+            <button className="btn btn-primary mt full" onClick={startSession}>Start Session</button>
           </>
         )}
       </Modal>

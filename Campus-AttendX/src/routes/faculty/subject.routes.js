@@ -5,14 +5,19 @@ const authMiddleware = require("../../middleware/authMiddleware");
 const roleMiddleware = require("../../middleware/role.middleware");
 const upload = require("../../middleware/upload.middleware");
 
-const {
-    createSubject,
-    getMySubjects,
-    getMySubjectById,
-    resubmitSubject,
-    deleteSubject
+const { 
+    createSubject, 
+    getMySubjects, 
+    getMySubjectById, 
+    resubmitSubject, 
+    deleteSubject 
 } = require("../../controllers/faculty/subject.controller");
 
+// ==========================================
+// FACULTY SUBJECT ROUTES
+// ==========================================
+
+// Create new subject (Upload Syllabus)
 router.post(
     "/",
     authMiddleware,
@@ -21,6 +26,7 @@ router.post(
     createSubject
 );
 
+// Get all submitted subjects
 router.get(
     "/my-submissions",
     authMiddleware,
@@ -28,6 +34,7 @@ router.get(
     getMySubjects
 );
 
+// Get single subject by ID
 router.get(
     "/my-submissions/:id",
     authMiddleware,
@@ -35,6 +42,7 @@ router.get(
     getMySubjectById
 );
 
+// Resubmit a rejected/pending subject
 router.patch(
     "/:id",
     authMiddleware,
@@ -43,6 +51,7 @@ router.patch(
     resubmitSubject
 );
 
+// Delete a subject (WITH CASCADE DELETE)
 router.delete(
     "/:id",
     authMiddleware,

@@ -1,19 +1,28 @@
 const express = require('express');
-const authentication = require('../middleware/authMiddleware');
-const {register, login, logout, me, refreshToken,changePassword} = require('../controllers/auth.controller');
+const authentication = require('../middleware/authMiddleware'); // Apne path ke hisaab se check kar lein
+const { 
+    register, 
+    login, 
+    logout, 
+    me, 
+    refreshToken, 
+    changePassword,
+    sendOtp, 
+    resetPasswordWithOtp 
+} = require('../controllers/auth.controller');
+
 const authRouter = express.Router();
 
-//Register
-authRouter.post('/auth/register',register);
-//login
-authRouter.post("/auth/login",login);
-//logout
-authRouter.post('/auth/logout', logout);
-//me
-authRouter.get("/auth/me",authentication,me);
-//refresh
-authRouter.post("/auth/refresh",refreshToken);
-//change-password..
-authRouter.patch("/auth/change-password",authentication,changePassword);
+// Yahan /auth nahi hoga, sirf direct route hoga
+authRouter.post('/register', register);
+authRouter.post('/login', login);
+authRouter.post('/logout', logout);
+authRouter.get('/me', authentication, me);
+authRouter.post('/refresh', refreshToken);
+authRouter.patch('/change-password', authentication, changePassword);
 
-module.exports  = authRouter;   
+// OTP Routes
+authRouter.post('/send-otp', sendOtp);
+authRouter.post('/reset-password', resetPasswordWithOtp);
+
+module.exports = authRouter;

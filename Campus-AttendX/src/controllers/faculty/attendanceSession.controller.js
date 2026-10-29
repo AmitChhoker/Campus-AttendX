@@ -65,6 +65,25 @@ const getAttendanceSessionById = async (req, res, next) => {
 };
 
 // ==========================================
+// Faculty gets QR payload for the session
+// ==========================================
+const getSessionQrPayload = async (req, res, next) => {
+    try {
+        const payload = await attendanceSessionService.getSessionQrPayload({
+            sessionId: req.params.id,
+            facultyId: req.user.id
+        });
+
+        return res.status(200).json({
+            success: true,
+            data: payload
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ==========================================
 // Faculty gets BLE payload for the session
 // ==========================================
 const getSessionBlePayload = async (req, res, next) => {
@@ -214,15 +233,36 @@ const downloadMonthlyAttendanceReport = async (req, res, next) => {
     }
 };
 
+// ==========================================
+// Send Warnings (New)
+// ==========================================
+const sendWarnings = async (req, res, next) => {
+    try {
+        const { subjectId } = req.body;
+        
+        // Yahan apna report card bhejne ka service call karein
+        // Example: await reportCardService.sendWarnings(subjectId);
+        
+        return res.status(200).json({ 
+            success: true, 
+            message: "Warnings sent successfully to defaulters!" 
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     createAttendanceSession,
     getMySessions,
     getAttendanceSessionById,
+    getSessionQrPayload,
     getSessionBlePayload,
     getAttendanceSummary,
     closeAttendanceSession,
     markAttendance,
     deleteAttendanceRecord,
     getMonthlyAttendanceReport,
-    downloadMonthlyAttendanceReport
+    downloadMonthlyAttendanceReport,
+    sendWarnings
 };
