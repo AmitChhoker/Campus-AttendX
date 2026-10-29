@@ -17,15 +17,16 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      // Yahan emailId aur password pass karna hai
-      await login(emailId, password); 
-      navigate("/");
-    } catch (error) {
-      alert(error.response?.data?.message || "Login failed. Please try again.");
-    } finally {
-      setLoading(false);
+        await login(emailId, password);
+        
+        // 🔥 navigate("/") ki jagah window.location.href use karein
+        window.location.href = "/"; 
+        
+    } catch (err) {
+        alert(err.response?.data?.message || "Login failed. Check credentials.");
+        setLoading(false);
     }
-  };
+};
 
   return (
     <div className="auth-page">

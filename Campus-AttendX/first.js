@@ -21,28 +21,16 @@ const allowedOrigins = [
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Postman / Mobile apps ke liye
         if (!origin) return callback(null, true);
-        
-        // 1. Localhost allow karein
-        if (origin.startsWith("http://localhost:")) {
+        if (origin.startsWith("http://localhost:") || origin.includes("vercel.app")) {
             return callback(null, true);
         }
-
-        // 2. Koi bhi Vercel URL allow karein (Dynamic)
-        if (origin.includes("vercel.app") || allowedOrigins.indexOf(origin) !== -1) {
-            return callback(null, true);
-        }
-
-        // 3. Baaki sab block karein
-        console.log("Blocked by CORS:", origin);
         callback(new Error('Not allowed by CORS'));
     },
-    credentials: true,
+    credentials: true, // Cookies allow karne ke liye
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"]
 }));
-
 // ==========================================
 // MIDDLEWARE
 // ==========================================
