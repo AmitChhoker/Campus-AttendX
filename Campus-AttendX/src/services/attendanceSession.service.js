@@ -325,7 +325,7 @@ const deleteAttendanceRecord = async ({ sessionId, studentId, facultyId }) => {
 };
 
 // ==========================================
-// MONTHLY REPORT (FIXED)
+// MONTHLY REPORT (FIXED AND COMPLETED)
 // ==========================================
 
 const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year }) => {
@@ -354,19 +354,14 @@ const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year })
         throw new Error("Approved subject not found or you are not authorized");
     }
 
-    // 🔥 FIX: UTC Dates use karein taaki timezone clash na ho
     const startDate = new Date(Date.UTC(selectedYear, selectedMonth - 1, 1, 0, 0, 0));
     const endDate = new Date(Date.UTC(selectedYear, selectedMonth, 1, 0, 0, 0));
     
-    // Testing ke liye restriction hatayi hui hai
-    
-    // Safe fetch enrolled students
     const allSubjectSessions = await AttendanceSession.find({ subject: subject._id }).select("_id");
     const allSessionIds = allSubjectSessions.map(s => s._id);
     
     const allAttendanceRecords = await Attendance.find({ session: { $in: allSessionIds } }).select("student");
     
-    // Safe check taaki null par crash na ho
     const enrolledStudentIds = [...new Set(
         allAttendanceRecords
             .filter(a => a.student) 
@@ -387,7 +382,8 @@ const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year })
         startedAt: { $gte: startDate, $lt: endDate }
     }).sort({ startedAt: 1 });
 
-    const totalClassesConducted = sessions.length;
+    const hoursPerClass = subject.hoursPerClass || 1;
+    const totalClassesConducted = sessions.length * hoursPerClass; 
 
     const subjectInfo = {
         id: subject._id,
@@ -411,7 +407,6 @@ const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year })
     }
 
     const sessionIds = sessions.map((s) => s._id);
-    
     const attendanceRecords = await Attendance.find({
         session: { $in: sessionIds },
         status: "present"
@@ -419,24 +414,25 @@ const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year })
 
     const attendanceCount = new Map();
     for (const r of attendanceRecords) {
-        if(r.student) {
-            const sid = r.student.toString();
-            attendanceCount.set(sid, (attendanceCount.get(sid) || 0) + 1);
-        }
+        const sid = r.student.toString();
+        attendanceCount.set(sid, (attendanceCount.get(sid) || 0) + 1);
     }
 
     const studentReports = students.map((s) => {
         const sid = s._id.toString();
-        const present = attendanceCount.get(sid) || 0;
-        const absent = totalClassesConducted - present;
-        const percentage = Number(((present / totalClassesConducted) * 100).toFixed(2));
+        
+        const presentSessionsCount = attendanceCount.get(sid) || 0;
+        const presentCredits = presentSessionsCount * hoursPerClass;
+        
+        const absent = totalClassesConducted - presentCredits;
+        const percentage = Number(((presentCredits / totalClassesConducted) * 100).toFixed(2));
 
         return {
             studentId: s._id,
             name: `${s.firstName} ${s.lastName}`,
             registrationNumber: s.registrationNumber,
             classesConducted: totalClassesConducted,
-            present,
+            present: presentCredits,
             absent,
             attendancePercentage: percentage,
             below75: percentage < 75

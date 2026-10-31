@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import client from "../../api/client";
 import { useToast } from "../../context/ToastContext";
-import { Plus, ChevronDown, ChevronUp } from "lucide-react";
+import { 
+  ChevronLeft, Plus, ChevronDown, ChevronUp, Play, History, 
+  GraduationCap, BookOpen, Clock, Award 
+} from "lucide-react";
 
 export default function FacultyCourses() {
   const { success, error } = useToast();
@@ -10,22 +13,21 @@ export default function FacultyCourses() {
   const [subjects, setSubjects] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  // Expanded state for accordions
   const [expandedCourse, setExpandedCourse] = useState(null);
   const [activeSemesterTab, setActiveSemesterTab] = useState({});
 
-  // Form State (Course added)
+  // Form State
   const [form, setForm] = useState({
     subjectName: "", subjectCode: "", course: "B.TECH",
-    branch: "CE", semester: 1, credits: 3, type: "theory", totalPlannedClasses: 40
+    branch: "CE", semester: 1, credits: 3, type: "theory", 
+    totalPlannedClasses: 40, sessionYear: "2023-2027", hoursPerClass: 1
   });
   const [file, setFile] = useState(null);
 
   const loadSubjects = () => {
     client.get("/subjects/my-submissions")
-      .then(r => setSubjects(r.data.data || []))
-      .catch(err => error(err.response?.data?.message || "Failed to load subjects"));
+      .then(r => setSubjects(r.data?.data || []))
+      .catch(err => error("Failed to load subjects"));
   };
 
   useEffect(() => { loadSubjects(); }, []);
@@ -40,24 +42,13 @@ export default function FacultyCourses() {
 
     try {
       await client.post("/subjects", formData, { headers: { "Content-Type": "multipart/form-data" } });
-      success("Subject submitted for Admin approval!");
+      success("Subject submitted!");
       setShowForm(false);
       loadSubjects(); 
     } catch (err) {
       error(err.response?.data?.message || "Upload failed");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure? This will delete the subject and ALL its attendance records.")) return;
-    try {
-      await client.delete(`/subjects/${id}`);
-      success("Subject deleted successfully");
-      loadSubjects();
-    } catch (err) {
-      error(err.response?.data?.message || "Failed to delete subject");
     }
   };
 
@@ -71,56 +62,62 @@ export default function FacultyCourses() {
     }
   };
 
-  // ----------------------------------------------------
-  // GROUPING LOGIC: Course -> Semester -> Subjects
-  // ----------------------------------------------------
+  // Grouping Logic
   const groupedSubjects = subjects.reduce((acc, sub) => {
-    const courseKey = `${sub.course || "Unknown"} - ${sub.branch || "Unknown"}`;
+    const courseKey = `${sub.course} - ${sub.branch}`;
     if (!acc[courseKey]) acc[courseKey] = {};
-    
     if (!acc[courseKey][sub.semester]) acc[courseKey][sub.semester] = [];
-    
     acc[courseKey][sub.semester].push(sub);
     return acc;
   }, {});
 
-  const toggleCourse = (courseKey) => {
-    setExpandedCourse(expandedCourse === courseKey ? null : courseKey);
-    // Default semester tab set to first available
-    if (expandedCourse !== courseKey) {
-      const semesters = Object.keys(groupedSubjects[courseKey]);
-      if (semesters.length > 0) {
-        setActiveSemesterTab({ ...activeSemesterTab, [courseKey]: semesters[0] });
-      }
+  const toggleCourse = (key) => {
+    setExpandedCourse(expandedCourse === key ? null : key);
+    if (expandedCourse !== key) {
+      const semesters = Object.keys(groupedSubjects[key]);
+      if (semesters.length > 0) setActiveSemesterTab({ ...activeSemesterTab, [key]: semesters[0] });
     }
   };
 
   return (
-    <div className="stack">
-      <div className="page-head">
-        <h2>My Courses</h2>
-        <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-          {showForm ? "Cancel" : <><Plus size={16} /> Upload New Subject</>}
+    <div className="stack pb-20">
+      {/* Top Navigation & Action */}
+      <div className="row-between mb-6">
+        <button className="btn btn-ghost sm hover-lift" onClick={() => navigate("/faculty")}>
+          <ChevronLeft size={18} /> Back
+        </button>
+        <button 
+          className={`btn ${showForm ? 'btn-danger' : 'btn-primary'} hover-lift`} 
+          onClick={() => setShowForm(!showForm)}
+        >
+          {showForm ? "Cancel Upload" : <><Plus size={16} /> Upload New Subject</>}
         </button>
       </div>
 
-      {/* UPLOAD FORM */}
+      <div className="page-head mb-6">
+        <h2 className="text-3xl font-bold text-gray-800">My Courses</h2>
+        <p className="muted mt-1">Manage your subjects, syllabus, and sessions.</p>
+      </div>
+
+      {/* Modern Upload Form */}
       {showForm && (
-        <form onSubmit={handleUpload} className="card form grid-2">
+        <form onSubmit={handleUpload} className="card glass-panel form grid-2 mb-8 animate-fade-in border-indigo-100 shadow-xl">
+          <div className="span-2 border-b pb-2 mb-2">
+            <h3 className="text-indigo-900 font-bold">Upload New Subject</h3>
+          </div>
+          
           <label className="field"><span>Course</span>
             <select value={form.course} onChange={e => setForm({...form, course: e.target.value})}>
-              <option value="B.TECH">B.TECH</option>
-              <option value="BCA">BCA</option>
-              <option value="DIPLOMA">DIPLOMA</option>
+              <option value="B.TECH">B.TECH</option><option value="BCA">BCA</option><option value="DIPLOMA">DIPLOMA</option>
             </select>
           </label>
           <label className="field"><span>Branch</span>
             <select value={form.branch} onChange={e => setForm({...form, branch: e.target.value})}>
-              <option value="CE">Computer Engineering (CE)</option>
-              <option value="AI/ML">AI/ML</option>
-              <option value="ECE">ECE</option>
-              <option value="ME">ME</option>
+              <option value="CE">Computer Engineering (CE)</option><option value="AI/ML">AI/ML</option><option value="ECE">ECE</option><option value="ME">ME</option>
             </select>
+          </label>
+          <label className="field"><span>Session Year (e.g. 2023-27)</span>
+            <input required value={form.sessionYear} onChange={e => setForm({...form, sessionYear: e.target.value})} />
           </label>
           <label className="field"><span>Semester</span>
             <input type="number" min="1" max="8" value={form.semester} onChange={e => setForm({...form, semester: e.target.value})} />
@@ -134,61 +131,76 @@ export default function FacultyCourses() {
           <label className="field"><span>Subject Type</span>
             <select value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
               <option value="theory">Theory</option>
-              <option value="lab">Practical</option>
+              <option value="lab">Practical / Lab</option>
+              <option value="project">Project</option>
             </select>
           </label>
-          <label className="field"><span>Credits</span>
-            <input type="decimal" min="1" value={form.credits} onChange={e => setForm({...form, credits: e.target.value})} />
+          <label className="field"><span>Hours per Class (Attendance Count)</span>
+            <select value={form.hoursPerClass} onChange={e => setForm({...form, hoursPerClass: e.target.value})}>
+              <option value="1">1 Hour (Counts as 1)</option>
+              <option value="2">2 Hours (Counts as 2)</option>
+              <option value="3">3 Hours (Counts as 3)</option>
+            </select>
           </label>
           <label className="field"><span>Total Planned Classes</span>
             <input type="number" min="1" value={form.totalPlannedClasses} onChange={e => setForm({...form, totalPlannedClasses: e.target.value})} />
           </label>
           <label className="field span-2"><span>Syllabus PDF</span>
-            <input type="file" accept="application/pdf" required onChange={e => setFile(e.target.files[0])} />
+            <input type="file" accept="application/pdf" required onChange={e => setFile(e.target.files[0])} className="p-2 border rounded-lg bg-white" />
           </label>
-          <button className="btn btn-primary span-2" disabled={loading}>{loading ? "Uploading..." : "Submit for Approval"}</button>
+          <button className="btn btn-primary span-2 mt-4" disabled={loading}>
+            {loading ? "Submitting..." : "Submit for Approval"}
+          </button>
         </form>
       )}
 
-      {/* GROUPED COURSES LIST */}
-      <div className="stack">
-        {Object.keys(groupedSubjects).length === 0 && <p className="muted center-text">No subjects uploaded yet.</p>}
-        
+      {/* Modern Accordion List */}
+      <div className="stack gap-4">
+        {Object.keys(groupedSubjects).length === 0 && !showForm && (
+          <div className="card center-text py-12 bg-gray-50 border-dashed">
+            <GraduationCap size={64} className="mx-auto text-gray-300 mb-4" />
+            <h3 className="text-gray-600">No Subjects Found</h3>
+            <p className="muted">Click "Upload New Subject" to add your first course.</p>
+          </div>
+        )}
+
         {Object.entries(groupedSubjects).map(([courseKey, semesters]) => {
           const isExpanded = expandedCourse === courseKey;
-          const semesterKeys = Object.keys(semesters).sort((a,b) => b - a); // Sort high to low
+          const semesterKeys = Object.keys(semesters).sort((a,b) => b - a);
           const currentTab = activeSemesterTab[courseKey] || semesterKeys[0];
-          const subjectsInTab = semesters[currentTab] || [];
-
+          
           return (
-            <div key={courseKey} className="card" style={{ padding: 0, overflow: "hidden" }}>
+            <div key={courseKey} className={`course-accordion ${isExpanded ? 'active' : ''}`}>
               
-              {/* COURSE HEADER (Accordion Toggle) */}
+              {/* Accordion Header */}
               <div 
-                style={{ padding: "1.5rem", background: isExpanded ? "var(--surface-2)" : "var(--surface)", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                className="course-header-modern" 
                 onClick={() => toggleCourse(courseKey)}
               >
-                <div>
-                  <h3 className="m-0">🎓 {courseKey}</h3>
-                  <p className="muted small mt-1">
-                    {Object.values(semesters).flat().length} Subjects Uploaded
-                  </p>
+                <div className="flex items-center gap-4">
+                  <div className="icon-box bg-indigo-100 text-indigo-600">
+                    <GraduationCap size={24} />
+                  </div>
+                  <div>
+                    <h3 className="course-title">{courseKey}</h3>
+                    <p className="course-subtitle">{Object.values(semesters).flat().length} Subjects Enrolled</p>
+                  </div>
                 </div>
-                <button className="btn btn-ghost">
-                  {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                </button>
+                <div className={`chevron-box ${isExpanded ? 'rotated' : ''}`}>
+                  <ChevronDown size={20} />
+                </div>
               </div>
 
-              {/* EXPANDED CONTENT (Semester Tabs & Subjects) */}
+              {/* Accordion Body */}
               {isExpanded && (
-                <div style={{ padding: "1.5rem", borderTop: "1px solid var(--border)" }}>
+                <div className="course-body animate-fade-in">
                   
                   {/* Semester Tabs */}
-                  <div className="tabs mb-4">
+                  <div className="modern-tabs">
                     {semesterKeys.map(sem => (
                       <button 
-                        key={sem}
-                        className={`tab ${currentTab === sem ? "active" : ""}`}
+                        key={sem} 
+                        className={`modern-tab ${currentTab === sem ? "active" : ""}`} 
                         onClick={() => setActiveSemesterTab({ ...activeSemesterTab, [courseKey]: sem })}
                       >
                         Semester {sem}
@@ -196,30 +208,45 @@ export default function FacultyCourses() {
                     ))}
                   </div>
 
-                  {/* Subjects in this Semester */}
-                  <div className="grid grid-2">
-                    {subjectsInTab.map(sub => (
-                      <div key={sub._id} className="card" style={{ background: "var(--bg)", boxShadow: "none", border: "1px solid var(--border)" }}>
-                        <div className="row-between">
-                          <h4 className="m-0">📘 {sub.subjectName}</h4>
-                          <span className={`pill pill-${sub.status}`}>{sub.status}</span>
-                        </div>
-                        <p className="small muted mt">
-                          Code: {sub.subjectCode} <br/>
-                          Type: {sub.type} · Credits: {sub.credits}
-                        </p>
+                  {/* Subject Cards Grid */}
+                  <div className="grid grid-2 gap-4 mt-6">
+                    {semesters[currentTab].map(sub => (
+                      <div key={sub._id} className="subject-card-modern">
                         
-                        <div className="row-gap mt">
+                        {/* Card Top: Name & Status */}
+                        <div className="row-between items-start mb-2">
+                          <h4 className="subject-name">
+                            <BookOpen size={16} className="text-indigo-400" /> {sub.subjectName}
+                          </h4>
+                          <span className={`status-badge status-${sub.status}`}>
+                            {sub.status}
+                          </span>
+                        </div>
+
+                        {/* Meta Info */}
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          <span className="meta-badge"><Clock size={12}/> {sub.subjectCode}</span>
+                          <span className="meta-badge"><Award size={12}/> {sub.credits} Credits</span>
+                          <span className="meta-badge capitalize">{sub.type}</span>
+                          <span className="meta-badge">{sub.hoursPerClass || 1} hr/class</span>
+                        </div>
+
+                        <p className="text-xs text-gray-500 mb-4">Session: {sub.sessionYear || 'N/A'}</p>
+                        
+                        {/* Action Buttons */}
+                        <div className="flex gap-2 mt-auto pt-3 border-t border-gray-100">
                           {sub.status === "approved" ? (
-                            <button onClick={() => handleStartSession(sub._id)} className="btn btn-primary sm">
-                              ▶ Play
+                            <button onClick={() => handleStartSession(sub._id)} className="btn btn-primary sm flex-1">
+                              <Play size={14} fill="currentColor"/> Start Session
                             </button>
                           ) : (
-                            <button className="btn btn-ghost sm" disabled>⏳ Pending</button>
+                            <button className="btn btn-ghost sm flex-1 cursor-not-allowed opacity-50">
+                              Pending Approval
+                            </button>
                           )}
-                          
-                          <button onClick={() => handleDelete(sub._id)} className="btn btn-danger sm">🗑 Delete</button>
-                          <Link to={`/faculty/courses/${sub._id}`} className="btn btn-ghost sm">→ History</Link>
+                          <Link to={`/faculty/courses/${sub._id}`} className="btn btn-ghost sm border-gray-200">
+                            <History size={14}/> History
+                          </Link>
                         </div>
                       </div>
                     ))}

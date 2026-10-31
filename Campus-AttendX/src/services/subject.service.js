@@ -22,7 +22,7 @@ const createSubject = async ({ data, facultyId, file }) => {
     const syllabus = await uploadToGoogleDrive(file);
 
     try {
-        const subject = await Subject.create({
+                const subject = await Subject.create({
             subjectName: data.subjectName,
             subjectCode: data.subjectCode,
             course: data.course,
@@ -30,14 +30,19 @@ const createSubject = async ({ data, facultyId, file }) => {
             semester: Number(data.semester),
             credits: Number(data.credits),
             type: data.type,
-            totalPlannedClasses: Number(data.totalPlannedClasses) || 40, // Fallback
+            totalPlannedClasses: Number(data.totalPlannedClasses) || 40,
+            
+            // 🔥 NAYE FIELDS SAVE KAREIN
+            sessionYear: data.sessionYear || "2024-2028",
+            hoursPerClass: Number(data.hoursPerClass) || 1,
+
             syllabus: {
                 fileId: syllabus.fileId,
                 fileName: syllabus.fileName,
                 fileUrl: syllabus.fileUrl
             },
             submittedBy: facultyId,
-            status: "approved" // Note: Ise 'pending' karein agar admin approval chahiye
+            status: "approved" 
         });
 
         return subject;

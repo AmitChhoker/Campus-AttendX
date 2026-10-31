@@ -3,7 +3,10 @@ import { useNavigate } from "react-router-dom";
 import client from "../../api/client";
 import Modal from "../../components/Modal";
 import { useToast } from "../../context/ToastContext";
-import { ChevronLeft, Plus, Calendar, Clock, BookOpen, Users, PlayCircle } from "lucide-react";
+import { 
+  ChevronLeft, Plus, Calendar, Clock, GraduationCap, BookOpen, 
+  ChevronDown, ChevronUp, ChevronRight // 🔥 Ye missing tha
+} from "lucide-react";
 
 export default function FacultySessions() {
   const { success, error } = useToast();
@@ -15,13 +18,16 @@ export default function FacultySessions() {
   const [showStart, setShowStart] = useState(false);
   const [subjectId, setSubjectId] = useState("");
 
+  // Accordion States
+  const [expandedCourse, setExpandedCourse] = useState(null);
+  const [expandedSubject, setExpandedSubject] = useState(null);
+
   const load = async () => {
     try {
       const [a, b] = await Promise.all([
         client.get("/attendance-sessions/my-sessions"),
         client.get("/subjects/my-submissions")
       ]);
-      // Safe fallback (taaki undefined par crash na ho)
       setSessions(a.data?.data || []); 
       setSubjects((b.data?.data || []).filter((s) => s.status === "approved"));
     } catch (err) {
@@ -45,99 +51,145 @@ export default function FacultySessions() {
     }
   };
 
-  // 🔥 Grouping Sessions by Subject
-  const groupedSessions = (sessions || []).reduce((acc, session) => {
-    const subId = session?.subject?._id;
-    if (!subId) return acc;
+  // Group by Course -> then Group by Subject
+  const groupedData = (sessions || []).reduce((acc, session) => {
+    const courseKey = `${session.subject?.course} - ${session.subject?.branch}`;
+    const subId = session.subject?._id;
+    
+    if (!courseKey || !subId) return acc;
 
-    if (!acc[subId]) {
-      acc[subId] = {
-        subject: session.subject,
-        sessions: []
-      };
+    if (!acc[courseKey]) {
+      acc[courseKey] = { courseName: courseKey, subjects: {}, totalSessions: 0 };
     }
-    acc[subId].sessions.push(session);
+
+    if (!acc[courseKey].subjects[subId]) {
+      acc[courseKey].subjects[subId] = { subjectInfo: session.subject, sessions: [] };
+    }
+
+    acc[courseKey].subjects[subId].sessions.push(session);
+    acc[courseKey].totalSessions += 1;
+
     return acc;
   }, {});
+
+  const toggleCourse = (courseKey) => {
+    setExpandedCourse(expandedCourse === courseKey ? null : courseKey);
+    setExpandedSubject(null); 
+  };
+
+  const toggleSubject = (subjectKey) => {
+    setExpandedSubject(expandedSubject === subjectKey ? null : subjectKey);
+  };
 
   if (loading) return <div className="loader-full">Loading Sessions...</div>;
 
   return (
     <div className="stack pb-20">
-      {/* Header & Back Button */}
-      <div className="row-between mb-4">
+      <div className="row-between mb-2">
         <button className="btn btn-ghost sm" onClick={() => navigate("/faculty")}>
-          <ChevronLeft size={18} /> Back to Dashboard
+          <ChevronLeft size={16} /> Back
         </button>
-        <button className="btn btn-primary" onClick={() => setShowStart(true)}>
-          <Plus size={16} /> Start New Session
+        <button className="btn btn-primary sm" onClick={() => setShowStart(true)}>
+          <Plus size={16} /> Start Session
         </button>
       </div>
 
-      <div className="page-head">
-        <h2>Course-wise Sessions</h2>
-        <p className="muted">Overview of all attendance sessions taken so far.</p>
+      <div className="page-head mb-4">
+        <h2 className="text-2xl font-bold text-gray-800">Course-wise Sessions</h2>
       </div>
 
-      {/* Empty State */}
-      {Object.keys(groupedSessions).length === 0 && (
-        <div className="card center-text py-10">
-          <Calendar size={64} className="mx-auto text-indigo-200 mb-4" />
-          <h3>No Sessions Found</h3>
-          <p className="muted mt-2">You haven't taken any attendance sessions yet.</p>
-          <button className="btn btn-primary mt-4" onClick={() => setShowStart(true)}>
-            Start Your First Session
-          </button>
+      {Object.keys(groupedData).length === 0 && (
+        <div className="card center-text py-8">
+          <Calendar size={48} className="mx-auto text-gray-300 mb-2" />
+          <p className="muted">No sessions found.</p>
         </div>
       )}
 
-      {/* Course-wise Session Cards */}
-      <div className="grid grid-2">
-        {Object.values(groupedSessions).map((group) => {
-          const sub = group.subject;
-          const subSessions = group.sessions;
-          
+      <div className="stack gap-3">
+        {Object.entries(groupedData).map(([courseKey, courseData]) => {
+          const isCourseExpanded = expandedCourse === courseKey;
+
           return (
-            <div key={sub._id} className="card hover-lift">
-              {/* Card Header: Subject Info */}
-              <div className="row-between mb-4 pb-4 border-b">
-                <div>
-                  <h3 className="m-0 text-indigo-600 flex items-center gap-2">
-                    <BookOpen size={20} /> {sub.subjectName}
-                  </h3>
-                  <p className="small muted mt-1">{sub.subjectCode} · {sub.branch} · Sem {sub.semester}</p>
+            <div key={courseKey} className={`modern-accordion-card compact ${isCourseExpanded ? 'active' : ''}`}>
+              
+              {/* COURSE HEADER */}
+              <div className="accordion-header" onClick={() => toggleCourse(courseKey)}>
+                <div className="flex items-center gap-3">
+                  <div className="icon-box bg-indigo-50 text-indigo-600">
+                    <GraduationCap size={20} />
+                  </div>
+                  <div>
+                    <h3 className="accordion-title">{courseData.courseName}</h3>
+                    <p className="accordion-subtitle">{Object.keys(courseData.subjects).length} Subjects · {courseData.totalSessions} Sessions</p>
+                  </div>
                 </div>
-                <div className="center-text">
-                  <h4 className="m-0 text-xl font-bold">{subSessions.length}</h4>
-                  <p className="small muted m-0">Sessions</p>
+                <div className={`chevron-box ${isCourseExpanded ? 'rotated' : ''}`}>
+                  <ChevronDown size={18} />
                 </div>
               </div>
 
-              {/* Sessions List for this Subject */}
-              <div className="scroll-feed" style={{ maxHeight: '200px' }}>
-                <ul className="list">
-                  {subSessions.map((sess) => (
-                    <li 
-                      key={sess._id} 
-                      className="list-row session-item" 
-                      onClick={() => navigate(`/faculty/session/${sess._id}`)}
-                      style={{ cursor: 'pointer', border: '1px solid var(--border)', marginBottom: '8px' }}
-                    >
-                      <div>
-                        <strong className="flex items-center gap-2">
-                           {new Date(sess.startedAt).toLocaleDateString("en-GB", { weekday: 'short', day: 'numeric', month: 'short' })}
-                        </strong>
-                        <p className="small muted m-0 flex items-center gap-1 mt-1">
-                          <Clock size={12}/> {new Date(sess.startedAt).toLocaleTimeString()}
-                        </p>
-                      </div>
-                      <span className={`pill ${sess.status === 'active' ? 'pill-approved' : 'pill-pending'}`}>
-                        {sess.status}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {/* SUBJECTS */}
+              {isCourseExpanded && (
+                <div className="accordion-body animate-fade-in">
+                  <div className="pl-2 border-l-2 border-indigo-100 flex flex-col gap-2">
+                    {Object.entries(courseData.subjects).map(([subId, subData]) => {
+                      const subjectKey = `${courseKey}-${subId}`;
+                      const isSubjectExpanded = expandedSubject === subjectKey;
+
+                      return (
+                        <div key={subId} className="subject-accordion-card compact">
+                          
+                          <div className="subject-header" onClick={() => toggleSubject(subjectKey)}>
+                            <div className="flex items-center gap-2">
+                              <BookOpen size={16} className="text-gray-400" />
+                              <div>
+                                <h4 className="subject-title-modern">{subData.subjectInfo.subjectName}</h4>
+                                <p className="text-xs text-gray-500 m-0">{subData.subjectInfo.subjectCode} · {subData.sessions.length} Sess</p>
+                              </div>
+                            </div>
+                            {isSubjectExpanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+                          </div>
+
+                          {/* SESSIONS */}
+                          {isSubjectExpanded && (
+                            <div className="subject-body animate-fade-in">
+                              <ul className="list">
+                                {subData.sessions.map((sess) => (
+                                  <li 
+                                    key={sess._id} 
+                                    className="session-item-modern" 
+                                    onClick={() => navigate(`/faculty/session/${sess._id}`)}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <div className="icon-circle">
+                                        <Calendar size={14} />
+                                      </div>
+                                      <div>
+                                        <strong className="block text-gray-800 text-sm">
+                                          {new Date(sess.startedAt).toLocaleDateString("en-GB", { day: 'numeric', month: 'short' })}
+                                        </strong>
+                                        <p className="text-xs text-gray-500 m-0">
+                                          {new Date(sess.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`status-badge text-[10px] status-${sess.status}`}>
+                                        {sess.status}
+                                      </span>
+                                      <ChevronRight size={16} className="text-gray-300" />
+                                    </div>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
@@ -160,7 +212,7 @@ export default function FacultySessions() {
                 <option value="">— pick a subject —</option>
                 {subjects.map((s) => (
                   <option key={s._id} value={s._id}>
-                    {s.subjectName} ({s.subjectCode})
+                    {s.course} - {s.subjectName}
                   </option>
                 ))}
               </select>

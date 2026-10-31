@@ -1165,3 +1165,322 @@ p  { margin: 0.25rem 0; }
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr !important; }
   .stat-row { flex-wrap: wrap !important; }
 }
+
+/* =========================================
+   MODERN COURSES UI
+   ========================================= */
+
+.course-accordion {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+
+.course-accordion:hover {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+.course-accordion.active {
+  border-color: var(--indigo-100);
+  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.08);
+}
+
+.course-header-modern {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  background: var(--surface);
+  transition: background 0.2s;
+}
+
+.course-header-modern:hover {
+  background: #f8fafc;
+}
+
+.icon-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+}
+
+.bg-indigo-100 { background: #e0e7ff; }
+.text-indigo-600 { color: #4f46e5; }
+
+.course-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.course-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0.2rem 0 0;
+  font-weight: 500;
+}
+
+.chevron-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  transition: all 0.3s;
+}
+
+.chevron-box.rotated {
+  transform: rotate(180deg);
+  background: var(--indigo-100);
+  color: var(--indigo);
+}
+
+/* Expanded Body */
+.course-body {
+  padding: 0 1.5rem 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Modern Tabs */
+.modern-tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem 0;
+  overflow-x: auto;
+}
+
+.modern-tab {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modern-tab:hover {
+  background: #e2e8f0;
+}
+
+.modern-tab.active {
+  background: var(--indigo);
+  color: white;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+/* Subject Cards Inside */
+.subject-card-modern {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.2s;
+}
+
+.subject-card-modern:hover {
+  border-color: var(--indigo-100);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.04);
+}
+
+.subject-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+/* Badges */
+.status-badge {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-approved { background: #d1fae5; color: #065f46; }
+.status-pending { background: #fef3c7; color: #92400e; }
+.status-rejected { background: #fee2e2; color: #991b1b; }
+
+.meta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Utilities */
+.items-start { align-items: flex-start; }
+.flex-1 { flex: 1; }
+.mt-auto { margin-top: auto; }
+.border-t { border-top: 1px solid var(--border); }
+
+/* =========================================
+   COMPACT MODERN ACCORDION (WITH LIGHT COLORS)
+   ========================================= */
+
+/* 1. COURSE LEVEL (Outer Card) */
+.modern-accordion-card.compact {
+  background: #f8faff; /* 🔥 Halka Blue tint */
+  border: 1px solid #e0e7ff;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.modern-accordion-card.compact.active {
+  border-color: #c7d2fe;
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.08);
+}
+
+.modern-accordion-card.compact .accordion-header {
+  padding: 0.85rem 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  background: transparent;
+}
+
+.modern-accordion-card.compact .icon-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #e0e7ff; /* Thoda aur dark indigo */
+  color: #4f46e5;
+}
+
+.modern-accordion-card.compact .accordion-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.modern-accordion-card.compact .accordion-subtitle {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.modern-accordion-card.compact .chevron-box {
+  width: 28px;
+  height: 28px;
+  background: white;
+  border: 1px solid #e0e7ff;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  transition: all 0.3s;
+}
+
+.modern-accordion-card.compact .chevron-box.rotated {
+  transform: rotate(180deg);
+  background: #e0e7ff;
+  color: #4f46e5;
+}
+
+/* Course Body (Area holding subjects) */
+.modern-accordion-card.compact .accordion-body {
+  padding: 0.75rem 1rem 1rem 1.25rem;
+  background: white; /* Inner body white */
+  border-top: 1px solid #e0e7ff;
+}
+
+/* 2. SUBJECT LEVEL (Nested inside Course) */
+.subject-accordion-card.compact {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #6366f1; /* 🔥 Left accent border for distinction */
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.subject-accordion-card.compact:hover {
+  border-color: #cbd5e1;
+  border-left-color: #4f46e5;
+}
+
+.subject-accordion-card.compact .subject-header {
+  padding: 0.65rem 0.85rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  background: #ffffff;
+}
+
+.subject-accordion-card.compact .subject-header:hover {
+  background: #f8fafc;
+}
+
+.subject-accordion-card.compact .subject-title-modern {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0;
+}
+
+/* Subject Body (Area holding sessions) */
+.subject-accordion-card.compact .subject-body {
+  padding: 0.5rem 0.85rem 0.75rem;
+  border-top: 1px dashed #e2e8f0;
+  background: #fdfdfd;
+}
+
+/* 3. SESSION LEVEL (Items inside Subject) */
+.session-item-modern {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  background: #f8fafc; /* 🔥 Halka gray tint */
+  margin-bottom: 0.4rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.session-item-modern:hover {
+  background: #eef2ff; /* Hover pe halka indigo */
+  border-color: #c7d2fe;
+  transform: translateX(2px);
+}
+
+.session-item-modern .icon-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  display: grid;
+  place-items: center;
+  color: #64748b;
+}
