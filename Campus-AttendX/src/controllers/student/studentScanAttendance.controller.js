@@ -1,5 +1,4 @@
 const studentScanAttendanceService = require("../../services/student/studentScanAttendance.service");
-
 const scanAttendance = async (req, res, next) => {
   try {
     const {
