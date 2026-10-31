@@ -22,7 +22,7 @@ const createSubject = async ({ data, facultyId, file }) => {
     const syllabus = await uploadToGoogleDrive(file);
 
     try {
-                const subject = await Subject.create({
+        const subject = await Subject.create({
             subjectName: data.subjectName,
             subjectCode: data.subjectCode,
             course: data.course,
@@ -31,11 +31,8 @@ const createSubject = async ({ data, facultyId, file }) => {
             credits: Number(data.credits),
             type: data.type,
             totalPlannedClasses: Number(data.totalPlannedClasses) || 40,
-            
-            // 🔥 NAYE FIELDS SAVE KAREIN
             sessionYear: data.sessionYear || "2024-2028",
             hoursPerClass: Number(data.hoursPerClass) || 1,
-
             syllabus: {
                 fileId: syllabus.fileId,
                 fileName: syllabus.fileName,
@@ -162,6 +159,8 @@ const resubmitSubject = async ({ subjectId, facultyId, data, file }) => {
     subject.semester = Number(data.semester);
     subject.credits = Number(data.credits);
     subject.type = data.type;
+    subject.sessionYear = data.sessionYear || "2024-2028";
+    subject.hoursPerClass = Number(data.hoursPerClass) || 1;
 
     let newSyllabus = null;
     const oldFileId = subject.syllabus?.fileId;
@@ -200,23 +199,18 @@ const resubmitSubject = async ({ subjectId, facultyId, data, file }) => {
 // Faculty Deletes Subject (With Cascade Delete)
 // ==========================================
 const deleteSubject = async ({ subjectId, facultyId }) => {
-    // 1. Check if subject exists
     const subject = await Subject.findOne({ _id: subjectId, submittedBy: facultyId });
     if (!subject) throw new Error("Subject not found or unauthorized");
 
-    // 2. Find all sessions for this subject
     const sessions = await AttendanceSession.find({ subject: subjectId });
     const sessionIds = sessions.map(s => s._id);
 
-    // 3. Delete all attendance records for these sessions
     if (sessionIds.length > 0) {
         await Attendance.deleteMany({ session: { $in: sessionIds } });
     }
 
-    // 4. Delete the sessions
     await AttendanceSession.deleteMany({ subject: subjectId });
 
-    // 5. Delete Syllabus from Google Drive (Optional)
     if (subject.syllabus && subject.syllabus.fileId) {
         try {
             await deleteFromGoogleDrive(subject.syllabus.fileId);
@@ -225,7 +219,6 @@ const deleteSubject = async ({ subjectId, facultyId }) => {
         }
     }
 
-    // 6. Finally delete the subject
     await Subject.findByIdAndDelete(subjectId);
 
     return { success: true, message: "Subject and all related data deleted." };
