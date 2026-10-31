@@ -986,3 +986,182 @@ p  { margin: 0.25rem 0; }
   0% { transform: scale(0); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
 }
+/* =========================================
+   MODERN FACULTY DASHBOARD & SESSION UI
+   ========================================= */
+
+/* Welcome Banner */
+.welcome-banner {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  border-radius: var(--radius);
+  padding: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3);
+}
+.welcome-icon { opacity: 0.2; }
+
+/* Modern Stat Box */
+.stat-modern {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+.stat-icon {
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  display: grid; place-items: center;
+  color: white;
+}
+.bg-indigo { background: var(--indigo); }
+.bg-green { background: var(--emerald); }
+.bg-red { background: var(--red); }
+.bg-gray { background: var(--text-muted); }
+.pulse { animation: pulse-bg 2s infinite; }
+
+/* Modern Active Session Banner */
+.active-session-banner-modern {
+  background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-decoration: none;
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+  transition: transform 0.2s;
+}
+.active-session-banner-modern:hover { transform: translateY(-2px); }
+.live-pulse-dot {
+  width: 14px; height: 14px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+  animation: live-pulse 1.5s infinite;
+}
+
+@keyframes live-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+/* Session Detail Split Layout */
+.session-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: 1.5rem;
+}
+@media (max-width: 900px) {
+  .session-grid { grid-template-columns: 1fr; }
+}
+
+/* Glowing QR Code */
+.qr-modern-card {
+  background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 2px solid #cbd5e1;
+}
+.qr-glow-wrapper {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 20px;
+  display: inline-block;
+  margin: 1rem 0;
+  box-shadow: 0 0 30px rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  transition: all 0.3s ease;
+}
+.qr-glow-wrapper:hover {
+  box-shadow: 0 0 40px rgba(99, 102, 241, 0.4);
+  transform: scale(1.02);
+}
+.qr-loading {
+  width: 220px; height: 220px;
+  display: grid; place-items: center;
+  background: var(--surface-2);
+  border-radius: 12px;
+  color: var(--text-muted);
+}
+
+/* Live Feed Lists */
+.scroll-feed {
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+.scroll-feed::-webkit-scrollbar { width: 6px; }
+.scroll-feed::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 10px; }
+
+.present-row { background: #ecfdf5; border: 1px solid #d1fae5; }
+.absent-row { background: #fef2f2; border: 1px solid #fee2e2; }
+
+.avatar-sm {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--indigo-100);
+  color: var(--indigo);
+  display: grid; place-items: center;
+  font-weight: bold; font-size: 0.9rem;
+}
+.hover-card:hover { background: var(--surface-2); }
+/* =========================================
+   MOBILE NAVIGATION & RESPONSIVENESS
+   ========================================= */
+
+.mobile-only { display: none !important; }
+
+@media (max-width: 900px) {
+  /* Layout setup */
+  .app-shell { display: block !important; }
+  
+  /* Hide Sidebar */
+  .sidebar { display: none !important; }
+  
+  /* Topbar adjustments */
+  .topbar { padding: 0.75rem 1rem !important; }
+  .mobile-only { display: grid !important; }
+  
+  /* Show Bottom Tabs */
+  .bottom-tabs {
+    display: flex !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    background: var(--surface) !important;
+    border-top: 1px solid var(--border) !important;
+    justify-content: space-around !important;
+    padding: 0.6rem 0 !important;
+    z-index: 9999 !important;
+    box-shadow: 0 -4px 10px rgba(0,0,0,0.05) !important;
+  }
+  
+  .bottom-tab {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    text-decoration: none !important;
+    color: var(--text-muted) !important;
+    font-size: 0.7rem !important;
+    font-weight: 600 !important;
+    gap: 0.2rem !important;
+    flex: 1 !important;
+  }
+  
+  .bottom-tab.active {
+    color: var(--indigo) !important;
+  }
+
+  /* Content padding taaki bottom bar content ko na dhake */
+  .content {
+    padding: 1rem !important;
+    padding-bottom: 90px !important; 
+  }
+
+  /* Grid Fixes */
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr !important; }
+  .stat-row { flex-wrap: wrap !important; }
+}

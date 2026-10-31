@@ -2,85 +2,156 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import client from "../../api/client";
-import { useToast } from "../../context/ToastContext"; // <-- Toast import kiya
+import { ChevronLeft, Users, CheckCircle, XCircle, StopCircle, RefreshCw } from "lucide-react";
 
 export default function FacultySessionDetail() {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const { success, error } = useToast();
+  const nav = useNavigate();
   
   const [session, setSession] = useState(null);
   const [qrPayload, setQrPayload] = useState("");
-  const [countdown, setCountdown] = useState(30);
+  const [summary, setSummary] = useState(null);
+  const [countdown, setCountdown] = useState(15);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch Session Details (Sahi API path)
+  // 1. Fetch Session Details
   useEffect(() => {
     client.get(`/attendance-sessions/${id}`)
       .then(res => setSession(res.data.data))
-      .catch(() => error("Session not found"));
+      .catch(() => {
+        alert("Session not found");
+        nav("/faculty/sessions");
+      })
+      .finally(() => setLoading(false));
   }, [id]);
 
-  // Fetch Dynamic QR Payload every 30s (Sahi API path)
+  // 2. Fetch QR & Summary
   useEffect(() => {
-    const fetchQr = () => {
-      client.get(`/attendance-sessions/${id}/qr`).then(res => {
+    const fetchQr = async () => {
+      if (session?.status !== "active") return;
+      try {
+        const res = await client.get(`/attendance-sessions/${id}/qr`);
         setQrPayload(JSON.stringify(res.data.data));
-        setCountdown(30);
-      }).catch(err => console.log("Session might be closed."));
+        setCountdown(15);
+      } catch (err) {}
     };
 
-    fetchQr(); // Initial fetch
-    const interval = setInterval(fetchQr, 30000); // Refresh every 30s
-    const timer = setInterval(() => setCountdown(c => (c > 0 ? c - 1 : 0)), 1000);
+    const fetchSummary = async () => {
+      try {
+        const res = await client.get(`/attendance-sessions/${id}/summary`);
+        setSummary(res.data.data);
+      } catch (err) {}
+    };
 
-    return () => { clearInterval(interval); clearInterval(timer); };
-  }, [id]);
+    if (session) {
+      fetchSummary();
+      if (session.status === "active") {
+        fetchQr();
+        const qrInt = setInterval(fetchQr, 15000);
+        const sumInt = setInterval(fetchSummary, 3000);
+        const timerInt = setInterval(() => setCountdown(c => (c > 0 ? c - 1 : 0)), 1000);
+        return () => { clearInterval(qrInt); clearInterval(sumInt); clearInterval(timerInt); };
+      }
+    }
+  }, [session?.status, id]);
 
-  // End Session API (PATCH method aur sahi path)
   const endSession = async () => {
-    if (!window.confirm("Are you sure you want to end this session for all students?")) return;
+    if (!window.confirm("End this session?")) return;
     try {
       await client.patch(`/attendance-sessions/${id}/close`);
-      success("Session ended successfully");
-      navigate("/faculty/sessions"); // Wapas list par
+      setSession({ ...session, status: "closed" }); 
+      setQrPayload("");
     } catch (err) {
-      error("Failed to end session");
+      alert("Failed to end session");
     }
   };
 
-  if (!session) return <div className="loader-full">Loading...</div>;
+  if (loading) return <div className="loader-full">Loading Session...</div>;
+  if (!session) return <div className="error-box">Session not found</div>;
 
   return (
-    <div className="stack">
-      <div className="card">
-        <div className="row-between">
-          <h2>{session.subject?.subjectName || "Active Session"}</h2>
-          <span className={`pill ${session.status === 'active' ? 'pill-approved' : 'pill-rejected'}`}>
-            [{session.status}]
-          </span>
-        </div>
-        <p className="muted">{session.subject?.subjectCode} · {session.subject?.branch} · Sem {session.subject?.semester}</p>
+    <div className="stack pb-20">
+      <div className="row-between">
+        <button className="btn btn-ghost sm" onClick={() => nav("/faculty/sessions")}>
+          <ChevronLeft size={18} /> Back to Sessions
+        </button>
+        <span className={`pill ${session.status === 'active' ? 'pill-approved' : 'pill-rejected'}`}>
+          {session.status.toUpperCase()}
+        </span>
       </div>
 
-      {session.status === "active" ? (
-        <>
-          <div className="card center-text">
-            <h3 className="card-title">DYNAMIC QR CODE</h3>
-            <div style={{ background: "white", padding: "1rem", display: "inline-block", borderRadius: "12px" }}>
-              {qrPayload ? <QRCodeSVG value={qrPayload} size={250} /> : "Generating..."}
+      <div className="card bg-gradient-to-r from-indigo-50 to-white">
+        <h2 className="m-0 text-indigo-900">{session.subject?.subjectName}</h2>
+        <p className="muted mt-1">{session.subject?.subjectCode} · {session.subject?.branch} · Sem {session.subject?.semester}</p>
+      </div>
+
+      <div className="session-grid">
+        {/* LEFT: QR or Closed Status */}
+        <div className="card center-text">
+          {session.status === "active" ? (
+            <>
+              <h3 className="card-title text-indigo">Scan to Mark Attendance</h3>
+              <div className="qr-glow-wrapper">
+                {qrPayload ? <QRCodeSVG value={qrPayload} size={220} level="H" includeMargin /> : <div className="qr-loading">Generating...</div>}
+              </div>
+              <div className="row-between mt-4 px-4">
+                <span className="muted small flex items-center gap-1"><RefreshCw size={14} className="animate-spin" /> Refreshes</span>
+                <span className="pill pill-pending font-bold">{countdown}s</span>
+              </div>
+              <button className="btn btn-danger w-full mt-4" onClick={endSession}>
+                <StopCircle size={18} /> End Session
+              </button>
+            </>
+          ) : (
+            <div className="py-8">
+              <XCircle size={64} className="mx-auto text-red-500 mb-4" />
+              <h3 className="text-xl font-bold">Session Closed</h3>
+              <p className="muted mt-2">Attendance is no longer being accepted.</p>
             </div>
-            <p className="muted mt">Refreshes in {countdown}s</p>
+          )}
+        </div>
+
+        {/* RIGHT: Live Stats */}
+        <div className="card">
+          <h3 className="card-title">Attendance Summary</h3>
+          <div className="stat-row mb-4">
+            <div className="stat-box"><h2>{summary?.summary?.totalStudents || 0}</h2><p>Total</p></div>
+            <div className="stat-box live"><h2>{summary?.summary?.present || 0}</h2><p>Present</p></div>
+            <div className="stat-box"><h2 className="text-red-500">{summary?.summary?.absent || 0}</h2><p>Absent</p></div>
           </div>
 
-          <button className="btn btn-danger full big" onClick={endSession}>
-            END SESSION
-          </button>
-        </>
-      ) : (
-        <div className="card center-text">
-          <h3 className="text-red-500">This session has ended.</h3>
+          <div className="scroll-feed mt-4">
+            <h4 className="flex items-center gap-2 mb-2 text-green-500">
+              <CheckCircle size={18} /> Present ({summary?.presentStudents?.length || 0})
+            </h4>
+            <ul className="list">
+              {(!summary?.presentStudents || summary.presentStudents.length === 0) && <li className="muted center-text py-2">Waiting for students...</li>}
+              {summary?.presentStudents?.map(s => (
+                <li key={s.studentId} className="list-row present-row">
+                  <div><strong>{s.name}</strong> <span className="small muted">{s.registrationNumber}</span></div>
+                  <span className="pill pill-approved">Present</span>
+                </li>
+              ))}
+            </ul>
+
+            {session.status !== "active" && summary?.absentStudents?.length > 0 && (
+              <>
+                <h4 className="flex items-center gap-2 mb-2 mt-4 text-red-500">
+                  <XCircle size={18} /> Absent ({summary?.absentStudents?.length || 0})
+                </h4>
+                <ul className="list">
+                  {summary?.absentStudents?.map(s => (
+                    <li key={s.studentId} className="list-row absent-row">
+                      <div><strong>{s.name}</strong> <span className="small muted">{s.registrationNumber}</span></div>
+                      <span className="pill pill-rejected">Absent</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

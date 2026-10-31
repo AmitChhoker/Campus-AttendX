@@ -20,6 +20,7 @@ import AdminSettings from "./pages/admin/Settings";
 import FacultyDashboard from "./pages/faculty/Dashboard";
 import FacultyCourses from "./pages/faculty/Courses";
 import FacultyCourseDetail from "./pages/faculty/CourseDetail";
+import FacultySessions from "./pages/faculty/Sessions"; // 🔥 Ye import missing tha
 import FacultySessionDetail from "./pages/faculty/SessionDetail";
 import FacultyStartSession from "./pages/faculty/StartSession";
 import FacultyReports from "./pages/faculty/Reports";
@@ -64,8 +65,13 @@ export default function App() {
           <Route path="/faculty" element={<FacultyDashboard />} />
           <Route path="/faculty/courses" element={<FacultyCourses />} />
           <Route path="/faculty/courses/:id" element={<FacultyCourseDetail />} />
+          
+          {/* 🔥 YE ROUTE MISSING THA: Sessions List */}
+          <Route path="/faculty/sessions" element={<FacultySessions />} />
+          
           <Route path="/faculty/session/start" element={<FacultyStartSession />} />
           <Route path="/faculty/session/:id" element={<FacultySessionDetail />} />
+          
           <Route path="/faculty/reports" element={<FacultyReports />} />
           <Route path="/faculty/profile" element={<FacultyProfile />} />
         </Route>
