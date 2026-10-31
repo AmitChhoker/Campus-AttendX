@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Html5Qrcode } from "html5-qrcode";
 import client from "../../api/client";
-import { QrCode, Bluetooth, ShieldCheck, Fingerprint, CheckCircle, AlertCircle } from "lucide-react";
+import { QrCode, Bluetooth, ShieldCheck, Fingerprint, CheckCircle, AlertCircle, FingerprintIcon } from "lucide-react";
 
 const getStoredDevice = () => {
   let dev = localStorage.getItem("attendx_device");
@@ -28,6 +28,53 @@ const STEPS = [
   { id: 3, label: "Device", icon: ShieldCheck },
   { id: 4, label: "Biometric", icon: Fingerprint }
 ];
+
+// 🔥 WebAuthn Helper Functions
+const registerBiometric = async () => {
+  if (!window.PublicKeyCredential) {
+    alert("Biometrics not supported on this browser.");
+    return false;
+  }
+  try {
+    const challenge = new Uint8Array(32);
+    window.crypto.getRandomValues(challenge);
+    const user = { id: new Uint8Array(16), name: "student@svsu.ac.in", displayName: "Student" };
+    
+    await navigator.credentials.create({
+      publicKey: {
+        challenge: challenge,
+        rp: { name: "AttendX", id: window.location.hostname },
+        user: user,
+        pubKeyCredParams: [{ alg: -7, type: "public-key" }],
+        authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+        timeout: 60000,
+      }
+    });
+    return true;
+  } catch (err) {
+    console.error("Registration failed", err);
+    return false;
+  }
+};
+
+const authenticateBiometric = async () => {
+  try {
+    const challenge = new Uint8Array(32);
+    window.crypto.getRandomValues(challenge);
+    
+    await navigator.credentials.get({
+      publicKey: {
+        challenge: challenge,
+        timeout: 60000,
+        userVerification: "required", // OS Sensor popup trigger karega
+      }
+    });
+    return true;
+  } catch (err) {
+    console.error("Auth failed", err);
+    return false;
+  }
+};
 
 export default function StudentMark() {
   const [step, setStep] = useState(1);
@@ -101,16 +148,25 @@ export default function StudentMark() {
       setError("");
       if (!scannedData) throw new Error("No QR data found. Please scan again.");
       
-      // 🔥 ASK FOR FINGERPRINT (Browser Prompt)
-      const userConfirmed = window.confirm("🔒 Biometric Authentication Required.\n\nPlease verify your fingerprint or face ID on your device to mark attendance.");
-      
-      if (!userConfirmed) {
-        return setError("Biometric authentication cancelled.");
-      }
-
       setIsAuthenticating(true); 
-      // Add a small delay for realistic UI feel
-      await new Promise(resolve => setTimeout(resolve, 1500)); 
+
+      // 1. Check if browser supports WebAuthn
+      if (window.PublicKeyCredential) {
+        // 2. Try to authenticate (This triggers the OS Fingerprint/FaceID)
+        const isAuthenticated = await authenticateBiometric();
+        
+        // 3. If OS prompt fails (maybe not registered yet), we register it now
+        if (!isAuthenticated) {
+           const registered = await registerBiometric();
+           if(!registered) {
+             throw new Error("Biometric authentication failed or cancelled.");
+           }
+        }
+      } else {
+         // Fallback for unsupported browsers
+         const userConfirmed = window.confirm("Biometric not supported. Click OK to simulate fingerprint.");
+         if(!userConfirmed) throw new Error("Biometric cancelled.");
+      }
       
       const dev = getStoredDevice();
       const challenge = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
@@ -131,6 +187,7 @@ export default function StudentMark() {
       setStep(5); 
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Failed to mark attendance");
+      // Reset to step 1 if auth fails
       setStep(1);
       setIsScanning(false);
       setScannedData(null);
@@ -223,9 +280,9 @@ export default function StudentMark() {
             
             <h2 className="text-2xl font-bold mb-2">Biometric Auth</h2>
             {isAuthenticating ? (
-              <p className="text-indigo-500 font-bold animate-pulse mb-6">Scanning biometric sensor...</p>
+              <p className="text-indigo-500 font-bold animate-pulse mb-6">Waiting for OS Biometric prompt...</p>
             ) : (
-              <p className="text-muted mb-6">Tap below to authenticate your fingerprint.</p>
+              <p className="text-muted mb-6">Tap below to trigger your device's fingerprint / FaceID.</p>
             )}
 
             <button 
