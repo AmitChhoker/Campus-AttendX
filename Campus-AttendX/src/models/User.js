@@ -97,7 +97,10 @@ const userSchema = new Schema(
             deviceId: { type: String, default: null, index: true },
             deviceKey: { type: String, default: null, select: false },
             boundAt: { type: Date, default: null }
-        }
+        },
+        // User.js ke andar jahan 'lastLogin' likha hai, uske thik upar add karein:
+        passwordChangedAt: [{ type: Date }], // 🔥 Ye naya field hai
+        lastLogin: { type: Date, default: null }
     },
     { timestamps: true }
 );

@@ -30,10 +30,17 @@ app.use(cors({
 // ==========================================
 // CACHE DISABLE (304 Error se bachne ke liye)
 // ==========================================
+// 🔥 API Caching (Instant Loads)
 app.use((req, res, next) => {
-    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.set("Pragma", "no-cache");
-    res.set("Expires", "0");
+    // Auth aur sensitive routes par NO-CACHE rakhein
+    if (req.path.includes("/auth") || req.path.includes("/profile")) {
+        res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    } else {
+        // Baaki GET requests ko 30 seconds ke liye cache karein
+        if (req.method === "GET") {
+            res.set("Cache-Control", "public, max-age=30");
+        }
+    }
     next();
 });
 

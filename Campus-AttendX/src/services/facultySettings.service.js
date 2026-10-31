@@ -23,7 +23,7 @@ const getMyProfile = async (facultyId) => {
 };
 
 // =====================================================
-// CHANGE PASSWORD
+// CHANGE PASSWORD (With 2 times/month limit)
 // =====================================================
 
 const changePassword = async ({
@@ -95,9 +95,35 @@ const changePassword = async ({
     }
 
     // ---------------------------------------------
+    // 🔥 CHECK 2 TIMES/MONTH LIMIT
+    // ---------------------------------------------
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // Agar database mein field nahi hai (purane users ke liye), toh empty array set karein
+    if (!faculty.passwordChangedAt) {
+        faculty.passwordChangedAt = [];
+    }
+
+    // Pichle 30 din mein kitni baar change hua hai?
+    const recentChanges = faculty.passwordChangedAt.filter(
+        date => new Date(date) >= thirtyDaysAgo
+    );
+
+    if (recentChanges.length >= 2) {
+        throw new Error(
+            "You can only change your password 2 times in a month. Please try again later."
+        );
+    }
+
+    // ---------------------------------------------
     // SAVE NEW HASHED PASSWORD
     // ---------------------------------------------
     faculty.password = await bcrypt.hash(newPassword, 12);
+    
+    // 🔥 History mein current date add karein
+    faculty.passwordChangedAt.push(new Date());
+    
     await faculty.save();
 
     // ---------------------------------------------
