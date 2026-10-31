@@ -6,14 +6,14 @@ const Attendance = require("../models/Attendance");
 const User = require("../models/User");
 
 const { generateBlePayload } = require("../utils/dynamicBle");
-const { generateDynamicQrPayload } = require("../utils/dynamicQr"); // <-- QR Generator import kiya
+const { generateDynamicQrPayload } = require("../utils/dynamicQr");
 
 // ==========================================
-// SESSION CONFIG
+// SESSION CONFIG (Testing ke liye time badhaya)
 // ==========================================
 
-const SESSION_DURATION = 5 * 60 * 1000; // 5 mins
-const QR_DURATION = 30 * 1000; // 30 seconds
+const SESSION_DURATION = 60 * 60 * 1000; // 1 Ghanta (Pehle 5 min tha)
+const QR_DURATION = 300 * 1000; // 5 Minute (Pehle 30 sec tha)
 
 // ==========================================
 // CREATE ATTENDANCE SESSION
@@ -24,11 +24,10 @@ const createAttendanceSession = async ({ facultyId, subjectId }) => {
         throw new Error("A valid subjectId is required");
     }
 
-    // 1. Verify Subject is Approved
     const subject = await Subject.findOne({
         _id: subjectId,
         submittedBy: facultyId,
-        status: "approved", // Sirf approved subject hi session start kar sakta hai
+        status: "approved",
         isActive: true
     });
 
@@ -36,27 +35,12 @@ const createAttendanceSession = async ({ facultyId, subjectId }) => {
         throw new Error("Approved subject not found or you are not authorized");
     }
 
-    // 2. Prevent multiple sessions within 1 hour (Testing ke liye abhi isko band rakha hai)
-    /*
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    const recentSession = await AttendanceSession.findOne({
-        subject: subjectId,
-        faculty: facultyId,
-        createdAt: { $gte: oneHourAgo }
-    });
-
-    if (recentSession) {
-        throw new Error("You already conducted attendance for this subject within the last hour");
-    }
-    */
-
     const startedAt = new Date();
     const expiresAt = new Date(startedAt.getTime() + SESSION_DURATION);
 
     const sessionCode = crypto.randomBytes(32).toString("hex");
     const bleSecret = crypto.randomBytes(32).toString("hex");
 
-    // 3. Create Session
     const session = await AttendanceSession.create({
         subject: subject._id,
         faculty: facultyId,
@@ -81,7 +65,6 @@ const createAttendanceSession = async ({ facultyId, subjectId }) => {
 
 const getMySessions = async (facultyId) => {
     return AttendanceSession.find({ faculty: facultyId })
-        // Yahan credits, type aur totalPlannedClasses add kiya
         .populate("subject", "subjectName subjectCode course branch semester credits type totalPlannedClasses") 
         .sort({ createdAt: -1 });
 };
@@ -101,7 +84,7 @@ const getAttendanceSessionById = async ({ sessionId, facultyId }) => {
 };
 
 // ==========================================
-// GET QR PAYLOAD FOR ACTIVE SESSION (NAYA ADD KIYA)
+// GET QR PAYLOAD
 // ==========================================
 
 const getSessionQrPayload = async ({ sessionId, facultyId }) => {
@@ -117,7 +100,7 @@ const getSessionQrPayload = async ({ sessionId, facultyId }) => {
 };
 
 // ==========================================
-// GET BLE PAYLOAD FOR ACTIVE SESSION
+// GET BLE PAYLOAD
 // ==========================================
 
 const getSessionBlePayload = async ({ sessionId, facultyId }) => {
@@ -225,7 +208,7 @@ const markAttendance = async ({ sessionId, studentId }) => {
 };
 
 // ==========================================
-// FACULTY GETS ATTENDANCE SUMMARY
+// FACULTY GETS ATTENDANCE SUMMARY (FIXED ROSTER)
 // ==========================================
 
 const getAttendanceSummary = async ({ sessionId, facultyId }) => {
@@ -241,25 +224,39 @@ const getAttendanceSummary = async ({ sessionId, facultyId }) => {
         throw new Error("Subject associated with this session was not found");
     }
 
+    // 🔥 FIX: "Active Roster" Logic. Sirf un students ko uthao jinhone is subject ki classes attend ki hain.
+    // 1. Is subject ke saare sessions ki IDs nikalo
+    const allSubjectSessions = await AttendanceSession.find({ subject: subject._id }).select("_id");
+    const allSessionIds = allSubjectSessions.map(s => s._id);
+
+    // 2. Un sessions mein se saari attendance records nikalo (taaki pata chale kaun enrolled hai)
+    const allAttendanceRecords = await Attendance.find({
+        session: { $in: allSessionIds }
+    }).select("student");
+
+    // 3. Unique student IDs nikaalo
+    const enrolledStudentIds = [...new Set(allAttendanceRecords.map(a => a.student.toString()))];
+
+    // 4. Agar koi student is session mein aaya hai jo pehle nahi aaya tha, toh usko bhi list mein jodo
+    const currentSessionRecords = await Attendance.find({ session: sessionId }).select("student");
+    currentSessionRecords.forEach(a => {
+        if (!enrolledStudentIds.includes(a.student.toString())) {
+            enrolledStudentIds.push(a.student.toString());
+        }
+    });
+
+    // 5. Ab sirf inhi specific students ki details database se laao
     const students = await User.find({
+        _id: { $in: enrolledStudentIds },
         role: "student",
-        course: subject.course,
-        branch: subject.branch,
-        semester: subject.semester,
         isActive: true
     })
         .select("firstName lastName registrationNumber")
         .sort({ registrationNumber: 1 });
 
-    const attendanceRecords = await Attendance.find({
-        session: sessionId,
-        status: "present"
-    }).populate("student", "firstName lastName registrationNumber");
-
+    // 6. Present aur Absent list banao
     const presentStudentIds = new Set(
-        attendanceRecords
-            .filter((r) => r.student)
-            .map((r) => r.student._id.toString())
+        currentSessionRecords.map((r) => r.student.toString())
     );
 
     const presentStudents = [];
@@ -307,7 +304,7 @@ const getAttendanceSummary = async ({ sessionId, facultyId }) => {
 };
 
 // ==========================================
-// DELETE A STUDENT'S ATTENDANCE (2-DAY WINDOW)
+// DELETE A STUDENT'S ATTENDANCE
 // ==========================================
 
 const deleteAttendanceRecord = async ({ sessionId, studentId, facultyId }) => {
@@ -333,9 +330,8 @@ const deleteAttendanceRecord = async ({ sessionId, studentId, facultyId }) => {
     return { removed: true, attendanceId: record._id };
 };
 
-
 // ==========================================
-// MONTHLY REPORT
+// MONTHLY REPORT (FIXED ROSTER)
 // ==========================================
 
 const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year }) => {
@@ -346,11 +342,9 @@ const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year })
     if (!Number.isInteger(selectedMonth) || selectedMonth < 1 || selectedMonth > 12) {
         throw new Error("Invalid month");
     }
-
     if (!Number.isInteger(selectedYear) || selectedYear < 2000 || selectedYear > currentYear) {
         throw new Error("Invalid year");
     }
-
     if (!subjectId || !/^[a-f\d]{24}$/i.test(String(subjectId))) {
         throw new Error("A valid subjectId is required");
     }
@@ -368,14 +362,28 @@ const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year })
 
     const startDate = new Date(selectedYear, selectedMonth - 1, 1);
     const endDate = new Date(selectedYear, selectedMonth, 1);
-
     const now = new Date();
 
     if (startDate > now) throw new Error("Future month attendance report is not available");
     if (now < endDate) {
-        throw new Error("Monthly attendance report is available only after the selected month has been completed");
+        throw new Error("Monthly report is available only after the selected month is completed");
     }
 
+    // 🔥 FIX: Report mein bhi sirf enrolled students dikhao
+    const allSubjectSessions = await AttendanceSession.find({ subject: subject._id }).select("_id");
+    const allSessionIds = allSubjectSessions.map(s => s._id);
+    const allAttendanceRecords = await Attendance.find({ session: { $in: allSessionIds } }).select("student");
+    const enrolledStudentIds = [...new Set(allAttendanceRecords.map(a => a.student.toString()))];
+
+    const students = await User.find({
+        _id: { $in: enrolledStudentIds },
+        role: "student",
+        isActive: true
+    })
+        .select("firstName lastName registrationNumber")
+        .sort({ registrationNumber: 1 });
+
+    // Selected month ke sessions
     const sessions = await AttendanceSession.find({
         subject: subject._id,
         faculty: facultyId,
@@ -383,16 +391,6 @@ const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year })
     }).sort({ startedAt: 1 });
 
     const totalClassesConducted = sessions.length;
-
-    const students = await User.find({
-        role: "student",
-        course: subject.course,
-        branch: subject.branch,
-        semester: subject.semester,
-        isActive: true
-    })
-        .select("firstName lastName registrationNumber")
-        .sort({ registrationNumber: 1 });
 
     const subjectInfo = {
         id: subject._id,
@@ -411,13 +409,11 @@ const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year })
             totalClassesConducted: 0,
             totalStudents: students.length,
             studentsBelow75: 0,
-             students: []
-            // 
+            students: []
         };
     }
 
     const sessionIds = sessions.map((s) => s._id);
-
     const attendanceRecords = await Attendance.find({
         session: { $in: sessionIds },
         status: "present"
@@ -433,9 +429,7 @@ const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year })
         const sid = s._id.toString();
         const present = attendanceCount.get(sid) || 0;
         const absent = totalClassesConducted - present;
-        const percentage = Number(
-            ((present / totalClassesConducted) * 100).toFixed(2)
-        );
+        const percentage = Number(((present / totalClassesConducted) * 100).toFixed(2));
 
         return {
             studentId: s._id,
@@ -515,7 +509,7 @@ module.exports = {
     createAttendanceSession,
     getMySessions,
     getAttendanceSessionById,
-    getSessionQrPayload, // <-- Ye add kiya
+    getSessionQrPayload,
     getSessionBlePayload,
     closeAttendanceSession,
     markAttendance,
