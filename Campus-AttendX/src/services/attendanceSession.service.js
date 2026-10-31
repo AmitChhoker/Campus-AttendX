@@ -9,11 +9,11 @@ const { generateBlePayload } = require("../utils/dynamicBle");
 const { generateDynamicQrPayload } = require("../utils/dynamicQr");
 
 // ==========================================
-// SESSION CONFIG (Testing ke liye time badhaya)
+// SESSION CONFIG
 // ==========================================
 
-const SESSION_DURATION = 60 * 60 * 1000; // 1 Ghanta (Pehle 5 min tha)
-const QR_DURATION = 300 * 1000; // 5 Minute (Pehle 30 sec tha)
+const SESSION_DURATION = 60 * 60 * 1000; // 1 Ghanta (Testing ke liye)
+const QR_DURATION = 300 * 1000; // 5 Minute (Testing ke liye)
 
 // ==========================================
 // CREATE ATTENDANCE SESSION
@@ -224,20 +224,16 @@ const getAttendanceSummary = async ({ sessionId, facultyId }) => {
         throw new Error("Subject associated with this session was not found");
     }
 
-    // 🔥 FIX: "Active Roster" Logic. Sirf un students ko uthao jinhone is subject ki classes attend ki hain.
-    // 1. Is subject ke saare sessions ki IDs nikalo
+    // Active Roster Logic
     const allSubjectSessions = await AttendanceSession.find({ subject: subject._id }).select("_id");
     const allSessionIds = allSubjectSessions.map(s => s._id);
 
-    // 2. Un sessions mein se saari attendance records nikalo (taaki pata chale kaun enrolled hai)
     const allAttendanceRecords = await Attendance.find({
         session: { $in: allSessionIds }
     }).select("student");
 
-    // 3. Unique student IDs nikaalo
     const enrolledStudentIds = [...new Set(allAttendanceRecords.map(a => a.student.toString()))];
 
-    // 4. Agar koi student is session mein aaya hai jo pehle nahi aaya tha, toh usko bhi list mein jodo
     const currentSessionRecords = await Attendance.find({ session: sessionId }).select("student");
     currentSessionRecords.forEach(a => {
         if (!enrolledStudentIds.includes(a.student.toString())) {
@@ -245,7 +241,6 @@ const getAttendanceSummary = async ({ sessionId, facultyId }) => {
         }
     });
 
-    // 5. Ab sirf inhi specific students ki details database se laao
     const students = await User.find({
         _id: { $in: enrolledStudentIds },
         role: "student",
@@ -254,7 +249,6 @@ const getAttendanceSummary = async ({ sessionId, facultyId }) => {
         .select("firstName lastName registrationNumber")
         .sort({ registrationNumber: 1 });
 
-    // 6. Present aur Absent list banao
     const presentStudentIds = new Set(
         currentSessionRecords.map((r) => r.student.toString())
     );
@@ -331,7 +325,7 @@ const deleteAttendanceRecord = async ({ sessionId, studentId, facultyId }) => {
 };
 
 // ==========================================
-// MONTHLY REPORT (FIXED ROSTER)
+// MONTHLY REPORT (FIXED)
 // ==========================================
 
 const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year }) => {
@@ -342,7 +336,7 @@ const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year })
     if (!Number.isInteger(selectedMonth) || selectedMonth < 1 || selectedMonth > 12) {
         throw new Error("Invalid month");
     }
-    if (!Number.isInteger(selectedYear) || selectedYear < 2000 || selectedYear > currentYear) {
+    if (!Number.isInteger(selectedYear) || selectedYear < 2000 || selectedYear > currentYear + 1) {
         throw new Error("Invalid year");
     }
     if (!subjectId || !/^[a-f\d]{24}$/i.test(String(subjectId))) {
@@ -360,20 +354,24 @@ const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year })
         throw new Error("Approved subject not found or you are not authorized");
     }
 
-    const startDate = new Date(selectedYear, selectedMonth - 1, 1);
-    const endDate = new Date(selectedYear, selectedMonth, 1);
-    const now = new Date();
-
-    if (startDate > now) throw new Error("Future month attendance report is not available");
-    if (now < endDate) {
-        throw new Error("Monthly report is available only after the selected month is completed");
-    }
-
-    // 🔥 FIX: Report mein bhi sirf enrolled students dikhao
+    // 🔥 FIX: UTC Dates use karein taaki timezone clash na ho
+    const startDate = new Date(Date.UTC(selectedYear, selectedMonth - 1, 1, 0, 0, 0));
+    const endDate = new Date(Date.UTC(selectedYear, selectedMonth, 1, 0, 0, 0));
+    
+    // Testing ke liye restriction hatayi hui hai
+    
+    // Safe fetch enrolled students
     const allSubjectSessions = await AttendanceSession.find({ subject: subject._id }).select("_id");
     const allSessionIds = allSubjectSessions.map(s => s._id);
+    
     const allAttendanceRecords = await Attendance.find({ session: { $in: allSessionIds } }).select("student");
-    const enrolledStudentIds = [...new Set(allAttendanceRecords.map(a => a.student.toString()))];
+    
+    // Safe check taaki null par crash na ho
+    const enrolledStudentIds = [...new Set(
+        allAttendanceRecords
+            .filter(a => a.student) 
+            .map(a => a.student.toString())
+    )];
 
     const students = await User.find({
         _id: { $in: enrolledStudentIds },
@@ -383,7 +381,6 @@ const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year })
         .select("firstName lastName registrationNumber")
         .sort({ registrationNumber: 1 });
 
-    // Selected month ke sessions
     const sessions = await AttendanceSession.find({
         subject: subject._id,
         faculty: facultyId,
@@ -414,6 +411,7 @@ const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year })
     }
 
     const sessionIds = sessions.map((s) => s._id);
+    
     const attendanceRecords = await Attendance.find({
         session: { $in: sessionIds },
         status: "present"
@@ -421,8 +419,10 @@ const getMonthlyAttendanceReport = async ({ subjectId, facultyId, month, year })
 
     const attendanceCount = new Map();
     for (const r of attendanceRecords) {
-        const sid = r.student.toString();
-        attendanceCount.set(sid, (attendanceCount.get(sid) || 0) + 1);
+        if(r.student) {
+            const sid = r.student.toString();
+            attendanceCount.set(sid, (attendanceCount.get(sid) || 0) + 1);
+        }
     }
 
     const studentReports = students.map((s) => {

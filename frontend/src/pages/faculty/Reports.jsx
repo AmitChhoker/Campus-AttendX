@@ -14,7 +14,8 @@ export default function FacultyReports() {
   const [selectedCourse, setSelectedCourse] = useState("");
   const [subjectId, setSubjectId] = useState("");
   
-  const [month, setMonth] = useState(new Date().getMonth());
+  // 🔥 FIX: Month ab 1-12 format mein hoga (Current month: new Date().getMonth() + 1)
+  const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -107,8 +108,13 @@ export default function FacultyReports() {
           {activeTab === "monthly" && (
             <label className="field"><span>Month/Year</span>
               <div className="row-gap">
+                {/* 🔥 FIX: Value 1-12 set kiya */}
                 <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-                  {[...Array(12)].map((_, i) => <option key={i} value={i}>{new Date(0, i).toLocaleString("en", { month: "short" })}</option>)}
+                  {[...Array(12)].map((_, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      {new Date(0, i).toLocaleString("en", { month: "short" })}
+                    </option>
+                  ))}
                 </select>
                 <input type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} style={{ width: '80px' }} />
               </div>
@@ -120,7 +126,7 @@ export default function FacultyReports() {
           {activeTab === "monthly" ? (
             <div className="row-gap">
               <button className="btn btn-primary" onClick={generateMonthly} disabled={loading}>Generate Report</button>
-              {report && report.students.length > 0 && <button className="btn btn-ghost" onClick={download}><Download size={16}/> CSV</button>}
+              {report && report.students?.length > 0 && <button className="btn btn-ghost" onClick={download}><Download size={16}/> CSV</button>}
             </div>
           ) : (
             <div className="warning-box bg-red-50 border-red-200 p-4 rounded-lg">
@@ -145,7 +151,7 @@ export default function FacultyReports() {
             <table className="table">
               <thead><tr><th>Roll No</th><th>Name</th><th>Present</th><th>%</th><th>Status</th></tr></thead>
               <tbody>
-                {report.students.map((s) => (
+                {report.students?.map((s) => (
                   <tr key={s.studentId}>
                     <td>{s.registrationNumber}</td>
                     <td><strong>{s.name}</strong></td>
