@@ -4,7 +4,6 @@ import { Html5Qrcode } from "html5-qrcode";
 import client from "../../api/client";
 import { QrCode, Bluetooth, ShieldCheck, Fingerprint, CheckCircle, AlertCircle } from "lucide-react";
 
-// 1. Device Helpers
 const getStoredDevice = () => {
   let dev = localStorage.getItem("attendx_device");
   if (!dev) {
@@ -16,7 +15,6 @@ const getStoredDevice = () => {
   return JSON.parse(dev);
 };
 
-// 2. HMAC Proof Generator
 const generateProof = async (secret, prefix, challenge) => {
   const enc = new TextEncoder();
   const key = await window.crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
@@ -39,7 +37,6 @@ export default function StudentMark() {
   const [isAuthenticating, setIsAuthenticating] = useState(false); 
   const navigate = useNavigate();
 
-  // Bind Device on Mount
   useEffect(() => {
     try {
       const dev = getStoredDevice();
@@ -47,7 +44,6 @@ export default function StudentMark() {
     } catch (err) {}
   }, []);
 
-  // QR Scan Logic
   useEffect(() => {
     if (!isScanning) return;
     
@@ -74,7 +70,7 @@ export default function StudentMark() {
                 setScannedData(parsed);
                 setIsScanning(false);
                 setError("");
-                setStep(2); // Move to BLE step
+                setStep(2); 
               } else {
                 setError("Invalid QR format");
                 setIsScanning(false);
@@ -100,14 +96,21 @@ export default function StudentMark() {
     };
   }, [isScanning]);
 
-  // Final Submit with Fingerprint Simulation
   const handleFinalSubmit = async () => {
     try {
       setError("");
       if (!scannedData) throw new Error("No QR data found. Please scan again.");
       
-      setIsAuthenticating(true); // Start Animation
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Fake sensor delay
+      // 🔥 ASK FOR FINGERPRINT (Browser Prompt)
+      const userConfirmed = window.confirm("🔒 Biometric Authentication Required.\n\nPlease verify your fingerprint or face ID on your device to mark attendance.");
+      
+      if (!userConfirmed) {
+        return setError("Biometric authentication cancelled.");
+      }
+
+      setIsAuthenticating(true); 
+      // Add a small delay for realistic UI feel
+      await new Promise(resolve => setTimeout(resolve, 1500)); 
       
       const dev = getStoredDevice();
       const challenge = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
@@ -125,7 +128,7 @@ export default function StudentMark() {
         bleRssi: -55 
       });
 
-      setStep(5); // Success
+      setStep(5); 
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Failed to mark attendance");
       setStep(1);
@@ -139,7 +142,6 @@ export default function StudentMark() {
   return (
     <div className="scan-dashboard pb-20">
       
-      {/* Modern Stepper Header */}
       <div className="modern-stepper">
         {STEPS.map((s, i) => {
           const isActive = step === s.id;
@@ -165,7 +167,6 @@ export default function StudentMark() {
           </div>
         )}
 
-        {/* STEP 1: QR SCAN */}
         {step === 1 && (
           <div className="glass-panel text-center animate-fade-in">
             <h2 className="text-2xl font-bold mb-2">Scan Attendance QR</h2>
@@ -189,7 +190,6 @@ export default function StudentMark() {
           </div>
         )}
 
-        {/* STEP 2: BLE */}
         {step === 2 && (
           <div className="glass-panel text-center animate-fade-in">
             <div className="icon-pulse-ring">
@@ -202,7 +202,6 @@ export default function StudentMark() {
           </div>
         )}
 
-        {/* STEP 3: DEVICE */}
         {step === 3 && (
           <div className="glass-panel text-center animate-fade-in">
              <div className="icon-pulse-ring">
@@ -215,7 +214,6 @@ export default function StudentMark() {
           </div>
         )}
 
-        {/* STEP 4: FINGERPRINT */}
         {step === 4 && (
           <div className="glass-panel text-center animate-fade-in">
             <div className={`fingerprint-sensor ${isAuthenticating ? 'scanning' : ''}`}>
@@ -240,7 +238,6 @@ export default function StudentMark() {
           </div>
         )}
 
-        {/* STEP 5: SUCCESS */}
         {step === 5 && (
           <div className="glass-panel text-center animate-fade-in success-panel">
             <div className="success-checkmark">

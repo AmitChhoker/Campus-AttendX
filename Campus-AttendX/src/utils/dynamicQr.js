@@ -1,13 +1,11 @@
 const crypto = require("crypto");
 
-// QR rotates every 30 seconds — matches frontend polling (25 s)
-const QR_INTERVAL_SECONDS = 5;
+// 🔥 30 seconds se badhakar 300 seconds (5 minutes) kar diya
+const QR_INTERVAL_SECONDS = 300; 
 
 const getQrSecret = () => {
   const secret = process.env.QR_SECRET_KEY;
-  if (!secret) {
-    throw new Error("QR_SECRET_KEY is not configured.");
-  }
+  if (!secret) throw new Error("QR_SECRET_KEY is not configured.");
   return secret;
 };
 
@@ -30,25 +28,15 @@ const generateDynamicQrPayload = (sessionId, now = Date.now()) => {
   };
 };
 
-const validateDynamicQrPayload = ({
-  sessionId,
-  window,
-  qrToken,
-  now = Date.now(),
-}) => {
-  if (
-    !sessionId ||
-    !Number.isSafeInteger(window) ||
-    typeof qrToken !== "string" ||
-    !/^[a-f0-9]{64}$/i.test(qrToken)
-  ) {
+const validateDynamicQrPayload = ({ sessionId, window, qrToken, now = Date.now() }) => {
+  if (!sessionId || !Number.isSafeInteger(window) || typeof qrToken !== "string" || !/^[a-f0-9]{64}$/i.test(qrToken)) {
     return false;
   }
 
   const currentWindow = Math.floor(now / (QR_INTERVAL_SECONDS * 1000));
 
-  // Allow current window AND the previous window (network tolerance)
-  if (window !== currentWindow && window !== currentWindow - 1) {
+  // 🔥 Testing ke liye pichle 2 window (total 15 minute) tak token valid rahega
+  if (window !== currentWindow && window !== currentWindow - 1 && window !== currentWindow - 2) {
     return false;
   }
 
