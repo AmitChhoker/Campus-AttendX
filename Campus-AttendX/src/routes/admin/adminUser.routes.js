@@ -1,5 +1,7 @@
 const express = require("express");
-const studentDeviceService = require("../../services/Student/studentDevice.service");
+
+// Naya (Sahi)
+const studentDeviceService = require("../../services/student/studentDevice.service");
 const router = express.Router();
 
 const authMiddleware =

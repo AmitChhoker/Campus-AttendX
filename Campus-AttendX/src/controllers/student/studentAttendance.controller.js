@@ -1,4 +1,4 @@
-const studentAttendanceService = require("../../services/Student/studentAttendance.service");
+const studentAttendanceService = require("../../services/student/studentAttendance.service");
 
 // =====================================================
 // GET MY ATTENDANCE

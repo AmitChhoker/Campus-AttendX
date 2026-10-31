@@ -1,5 +1,5 @@
 const studentNotificationService = require(
-  "../../services/Student/studentNotification.service"
+  "../../services/student/studentNotification.service"
 );
 
 // GET: All student notifications

@@ -1,5 +1,5 @@
 const studentSettingsService = require(
-  "../../services/Student/studentSettings.service"
+  "../../services/student/studentSettings.service"
 );
 
 // GET /api/student/settings/profile
