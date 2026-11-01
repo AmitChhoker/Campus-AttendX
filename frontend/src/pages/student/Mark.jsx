@@ -36,7 +36,19 @@ export default function StudentMark() {
   const [scannedData, setScannedData] = useState(null);
   const [error, setError] = useState("");
   const [isAuthenticating, setIsAuthenticating] = useState(false); 
+  const [biometricAvailable, setBiometricAvailable] = useState(true); // 🔥 New state
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // 🔥 Check if device supports biometrics
+    if (window.PublicKeyCredential) {
+      window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+        .then((available) => setBiometricAvailable(available))
+        .catch(() => setBiometricAvailable(false));
+    } else {
+      setBiometricAvailable(false);
+    }
+  }, []);
 
   useEffect(() => {
     try {
@@ -99,35 +111,35 @@ export default function StudentMark() {
     };
   }, [isScanning]);
 
-  // 🔥 STRICT FINGERPRINT SCAN (No Bypass Allowed)
+  // 🔥 Handle Biometric Click
   const handleFingerprintClick = async () => {
     if (isAuthenticating) return;
-    
     setError("");
     setIsAuthenticating(true);
 
     try {
-      // 1. Force OS Biometric Prompt
-      if (!window.PublicKeyCredential) {
-        throw new Error("Biometric authentication is not supported on this device.");
+      if (biometricAvailable) {
+        // Trigger OS Biometric
+        const challenge = new Uint8Array(32);
+        window.crypto.getRandomValues(challenge);
+        
+        await navigator.credentials.get({
+          publicKey: {
+            challenge: challenge,
+            timeout: 60000,
+            userVerification: "required",
+          }
+        });
+      } else {
+        // Fallback for devices without biometric hardware
+        const confirm = window.confirm("Biometric not available on this device. Click OK to manually confirm attendance.");
+        if (!confirm) throw new Error("Authentication cancelled.");
       }
 
-      const challenge = new Uint8Array(32);
-      window.crypto.getRandomValues(challenge);
-      
-      // Agar user cancel karega ya fail hoga, toh ye error throw karega
-      await navigator.credentials.get({
-        publicKey: {
-          challenge: challenge,
-          timeout: 60000,
-          userVerification: "required", // Forces biometric
-        }
-      });
-
-      // 2. Visual scanning delay (Only runs if biometric PASSES)
+      // Visual delay
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      // 3. Generate Proofs & Submit
+      // Generate Proofs & Submit
       const dev = getStoredDevice();
       const challengeString = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
       
@@ -147,10 +159,8 @@ export default function StudentMark() {
       setStep(5); 
 
     } catch (err) {
-      // 🔥 Agar biometric fail hua toh yahan error aayega aur submit nahi hoga
-      console.error("Biometric Error:", err);
-      setError(err.message || "Fingerprint authentication failed or cancelled.");
-      // Step 4 par hi rahenge taaki dobara try kar sake
+      console.error("Auth Error:", err);
+      setError(err.message || "Authentication failed or cancelled. Please try again.");
     } finally {
       setIsAuthenticating(false);
     }
@@ -245,7 +255,7 @@ export default function StudentMark() {
           </div>
         )}
 
-        {/* STEP 4: STRICT FINGERPRINT */}
+        {/* STEP 4: BIOMETRIC */}
         {step === 4 && (
           <div className="mark-card text-center animate-fade-in">
             <h2 className="text-2xl font-bold mt-2">Biometric Auth</h2>
@@ -253,7 +263,9 @@ export default function StudentMark() {
             {isAuthenticating ? (
               <p className="text-indigo-500 font-bold animate-pulse mt-2 mb-6">Scanning fingerprint...</p>
             ) : (
-              <p className="text-muted mt-2 mb-6">Touch the sensor below to verify.</p>
+              <p className="text-muted mt-2 mb-6">
+                {biometricAvailable ? "Touch the sensor below to verify." : "Biometric not available. Click below to confirm."}
+              </p>
             )}
 
             <div 

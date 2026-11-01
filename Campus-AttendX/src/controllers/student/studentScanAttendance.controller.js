@@ -71,7 +71,6 @@ const scanAttendance = async ({
     fingerprintVerified = verifyProof({ secret: student.deviceBinding.deviceKey, prefix: FINGERPRINT_PROOF_PREFIX, challenge, proof: fingerprintProof });
     if (!fingerprintVerified) throw createError("Fingerprint authentication failed.", 403);
   } else if (fingerprintProof) {
-    // Agar require nahi hai par frontend bhej raha hai, toh verify toh karo
     fingerprintVerified = verifyProof({ secret: student.deviceBinding.deviceKey, prefix: FINGERPRINT_PROOF_PREFIX, challenge, proof: fingerprintProof });
     if (!fingerprintVerified) throw createError("Fingerprint authentication failed.", 403);
   }
