@@ -29,22 +29,27 @@ const STEPS = [
   { id: 4, label: "Biometric", icon: Fingerprint }
 ];
 
-// 🔥 Smart Biometric (No blocking alert)
-// Mark.jsx mein sirf is function ko check karein:
+// 🔥 STRICT BIOMETRIC (No Attendance without Fingerprint)
 const authenticateBiometric = async () => {
   try {
-    if (!window.PublicKeyCredential) return; // Skip if unsupported
+    if (!window.PublicKeyCredential) {
+      throw new Error("Biometric authentication is not supported on this device.");
+    }
     const challenge = new Uint8Array(32);
     window.crypto.getRandomValues(challenge);
+    
+    // Ye line OS ka Fingerprint/FaceID popup trigger karegi
     await navigator.credentials.get({
       publicKey: {
         challenge: challenge,
         timeout: 60000,
-        userVerification: "required",
+        userVerification: "required", // Forces biometric/PIN
       }
     });
   } catch (err) {
-    console.warn("Biometric skipped/failed:", err.message);
+    console.error("Biometric Error:", err);
+    // Agar cancel hua ya fail hua toh error throw karega
+    throw new Error("Fingerprint authentication failed or was cancelled.");
   }
 };
 
@@ -124,10 +129,10 @@ export default function StudentMark() {
       if (!scannedData) throw new Error("No QR data found. Please scan again.");
       setIsAuthenticating(true); 
       
-      // 1. Try Biometric (Non-blocking)
+      // 1. STRICT BIOMETRIC CHECK (Agar fail hua toh yahin ruk jayega)
       await authenticateBiometric();
       
-      // 2. Generate Proofs & Submit
+      // 2. Generate Proofs & Submit (Sirf biometric success ke baad chalega)
       const dev = getStoredDevice();
       const challenge = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
       
@@ -146,7 +151,10 @@ export default function StudentMark() {
 
       setStep(5); 
     } catch (err) {
-      setError(err.response?.data?.message || err.message || "Failed to mark attendance");
+      // Agar biometric fail hua, toh yahan error catch hoga
+      setError(err.message || err.response?.data?.message || "Failed to mark attendance");
+      
+      // Step 1 (QR Scan) par wapas bhej dein taaki dobara try kar sake
       setStep(1);
       setIsScanning(false);
       setScannedData(null);
