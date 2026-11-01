@@ -2206,3 +2206,58 @@ p  { margin: 0.25rem 0; }
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
   margin-bottom: 1rem;
 }
+
+/* =========================================
+   INTERACTIVE FINGERPRINT SENSOR
+   ========================================= */
+
+.fingerprint-sensor-btn {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  position: relative;
+  cursor: pointer;
+  border: 3px solid #e2e8f0;
+  transition: all 0.3s ease;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+.fingerprint-sensor-btn:hover:not(.scanning) {
+  background: #e0e7ff;
+  border-color: #6366f1;
+  transform: scale(1.05);
+}
+
+.fingerprint-sensor-btn.scanning {
+  border-color: #10b981;
+  background: #ecfdf5;
+  cursor: not-allowed;
+  box-shadow: 0 0 25px rgba(16, 185, 129, 0.3);
+}
+
+.fp-laser {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: #10b981;
+  box-shadow: 0 0 15px #10b981;
+  opacity: 0;
+}
+
+.fingerprint-sensor-btn.scanning .fp-laser {
+  opacity: 1;
+  animation: fp-scan 1.5s ease-in-out infinite;
+}
+
+@keyframes fp-scan {
+  0% { top: 5%; }
+  50% { top: 95%; }
+  100% { top: 5%; }
+}

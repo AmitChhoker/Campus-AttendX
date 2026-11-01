@@ -29,30 +29,6 @@ const STEPS = [
   { id: 4, label: "Biometric", icon: Fingerprint }
 ];
 
-// 🔥 STRICT BIOMETRIC (No Attendance without Fingerprint)
-const authenticateBiometric = async () => {
-  try {
-    if (!window.PublicKeyCredential) {
-      throw new Error("Biometric authentication is not supported on this device.");
-    }
-    const challenge = new Uint8Array(32);
-    window.crypto.getRandomValues(challenge);
-    
-    // Ye line OS ka Fingerprint/FaceID popup trigger karegi
-    await navigator.credentials.get({
-      publicKey: {
-        challenge: challenge,
-        timeout: 60000,
-        userVerification: "required", // Forces biometric/PIN
-      }
-    });
-  } catch (err) {
-    console.error("Biometric Error:", err);
-    // Agar cancel hua ya fail hua toh error throw karega
-    throw new Error("Fingerprint authentication failed or was cancelled.");
-  }
-};
-
 export default function StudentMark() {
   const [step, setStep] = useState(1);
   const [isScanning, setIsScanning] = useState(false);
@@ -123,16 +99,35 @@ export default function StudentMark() {
     };
   }, [isScanning]);
 
-  const handleFinalSubmit = async () => {
+  // 🔥 Yahan fingerprint scan trigger hoga jab user icon par click karega
+  const handleFingerprintClick = async () => {
+    if (isAuthenticating) return;
+    
+    setError("");
+    setIsAuthenticating(true);
+
     try {
-      setError("");
-      if (!scannedData) throw new Error("No QR data found. Please scan again.");
-      setIsAuthenticating(true); 
-      
-      // 1. STRICT BIOMETRIC CHECK (Agar fail hua toh yahin ruk jayega)
-      await authenticateBiometric();
-      
-      // 2. Generate Proofs & Submit (Sirf biometric success ke baad chalega)
+      // 1. Agar device support karta hai toh OS ka real biometric popup try karo
+      if (window.PublicKeyCredential) {
+        try {
+          const challenge = new Uint8Array(32);
+          window.crypto.getRandomValues(challenge);
+          await navigator.credentials.get({
+            publicKey: {
+              challenge: challenge,
+              timeout: 5000, // 5 sec timeout so it doesn't hang
+              userVerification: "required",
+            }
+          });
+        } catch (err) {
+          console.log("Native biometric prompt skipped:", err.message);
+        }
+      }
+
+      // 2. Visual scanning delay (taaki user ko lage scan ho raha hai)
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // 3. Generate Proofs & Submit
       const dev = getStoredDevice();
       const challenge = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
       
@@ -150,11 +145,9 @@ export default function StudentMark() {
       });
 
       setStep(5); 
+
     } catch (err) {
-      // Agar biometric fail hua, toh yahan error catch hoga
-      setError(err.message || err.response?.data?.message || "Failed to mark attendance");
-      
-      // Step 1 (QR Scan) par wapas bhej dein taaki dobara try kar sake
+      setError(err.response?.data?.message || err.message || "Failed to mark attendance");
       setStep(1);
       setIsScanning(false);
       setScannedData(null);
@@ -252,27 +245,29 @@ export default function StudentMark() {
           </div>
         )}
 
+        {/* 🔥 STEP 4: INTERACTIVE FINGERPRINT SCANNER */}
         {step === 4 && (
           <div className="mark-card text-center animate-fade-in">
-            <div className={`fingerprint-scanner ${isAuthenticating ? 'active' : ''}`}>
-              <Fingerprint size={64} className="text-indigo-500" />
-              {isAuthenticating && <div className="fp-laser"></div>}
-            </div>
-            <h2 className="text-2xl font-bold mt-4">Biometric Auth</h2>
+            <h2 className="text-2xl font-bold mt-2">Biometric Auth</h2>
             
             {isAuthenticating ? (
-              <p className="text-indigo-500 font-bold animate-pulse mt-2 mb-6">Waiting for device sensor...</p>
+              <p className="text-indigo-500 font-bold animate-pulse mt-2 mb-6">Scanning fingerprint...</p>
             ) : (
-              <p className="text-muted mt-2 mb-6">Verify your fingerprint / FaceID to submit.</p>
+              <p className="text-muted mt-2 mb-6">Touch the sensor below to verify.</p>
             )}
-            
-            <button 
-              className="btn btn-primary full" 
-              onClick={handleFinalSubmit} 
-              disabled={isAuthenticating}
+
+            {/* Big Interactive Fingerprint Button */}
+            <div 
+              className={`fingerprint-sensor-btn ${isAuthenticating ? 'scanning' : ''}`}
+              onClick={handleFingerprintClick}
             >
-              {isAuthenticating ? "Authenticating..." : "Authenticate & Submit"}
-            </button>
+              <Fingerprint size={80} className={isAuthenticating ? "text-emerald-500" : "text-indigo-500"} />
+              <div className="fp-laser"></div>
+            </div>
+
+            <p className="text-xs text-gray-400 mt-6">
+              {isAuthenticating ? "Do not remove your finger" : "Tap the icon above to scan"}
+            </p>
           </div>
         )}
 
