@@ -8,7 +8,7 @@ export default function Login() {
   
   const [emailId, setEmailId] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false); // 🔥 Eye Toggle State
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   if (user) {
@@ -28,9 +28,11 @@ export default function Login() {
 
   return (
     <div className="auth-page modern-auth-bg">
-      <div className="auth-card glass-panel">
-        <div className="auth-brand text-center mb-6">
-          <div className="auth-icon-wrapper mx-auto mb-3">
+      <div className="auth-card glass-panel login-card">
+        
+        {/* 🔥 LOGO & HEADER SECTION */}
+        <div className="auth-header-centered mb-6">
+          <div className="auth-icon-wrapper">
             <GraduationCap size={32} />
           </div>
           <h1 className="text-2xl font-bold text-gray-800">Welcome Back</h1>
@@ -65,7 +67,6 @@ export default function Login() {
                 placeholder="••••••••" 
                 className="text-gray-800 font-medium"
               />
-              {/* 🔥 Eye Icon Button */}
               <button 
                 type="button" 
                 className="password-toggle"

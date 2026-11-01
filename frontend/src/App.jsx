@@ -3,14 +3,14 @@ import { lazy, Suspense } from "react";
 import { useAuth } from "./context/AuthContext";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
-import Loader from "./components/Loader"; // Apna loader component
+import Loader from "./components/Loader"; 
 
 // Auth Pages (Direct Import)
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Recover from "./pages/Recover";
 
-// 🔥 LAZY LOADING: Ye pages tabhi load honge jab jarurat hogi
+// 🔥 LAZY LOADING
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
 const AdminUsers = lazy(() => import("./pages/admin/Users"));
 const AdminUserDetail = lazy(() => import("./pages/admin/UserDetail"));
@@ -31,6 +31,8 @@ const StudentDashboard = lazy(() => import("./pages/student/Dashboard"));
 const StudentMark = lazy(() => import("./pages/student/Mark"));
 const StudentAttendance = lazy(() => import("./pages/student/Attendance"));
 const StudentProfile = lazy(() => import("./pages/student/Profile"));
+
+// 🔥 FIX: Exact file name (SubjectDetail) use kiya hai
 const StudentSubjectDetail = lazy(() => import("./pages/student/SubjectDetail"));
 
 function RoleLanding() {
@@ -41,10 +43,9 @@ function RoleLanding() {
 
 export default function App() {
   return (
-    // 🔥 Suspense fallback tab dikhega jab naya page load ho raha hoga
     <Suspense fallback={<div className="loader-full"><Loader /></div>}>
       <Routes>
-         <Route path="/recover" element={<Recover />} />
+        <Route path="/recover" element={<Recover />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/" element={<RoleLanding />} />

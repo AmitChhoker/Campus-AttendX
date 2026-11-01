@@ -8,8 +8,7 @@ export default function Register() {
   const navigate = useNavigate();
   const { success, error } = useToast();
   const [loading, setLoading] = useState(false);
-  
-  const [showPassword, setShowPassword] = useState(false); // 🔥 Eye Toggle State
+  const [showPassword, setShowPassword] = useState(false);
 
   const [form, setForm] = useState({
     firstName: "",
@@ -45,19 +44,20 @@ export default function Register() {
   };
 
   return (
-    <div className="auth-page modern-auth-bg py-10">
-      <div className="auth-card glass-panel" style={{ maxWidth: "700px" }}>
-        <div className="auth-brand text-center mb-6">
-          <div className="auth-icon-wrapper mx-auto mb-3">
+    <div className="auth-page modern-auth-bg">
+      <div className="auth-card glass-panel register-card">
+        
+        {/* 🔥 LOGO & HEADER SECTION */}
+        <div className="auth-header-centered mb-6">
+          <div className="auth-icon-wrapper">
             <GraduationCap size={32} />
           </div>
           <h1 className="text-2xl font-bold text-gray-800">Create Account</h1>
           <p className="text-gray-500 mt-1">Join AttendX to track your attendance</p>
         </div>
 
-        <form onSubmit={submit} className="form grid-2">
+        <form onSubmit={submit} className="form register-form-grid">
           
-          {/* Section: Personal Info */}
           <div className="span-2 auth-section-title">
             <User size={16} /> Personal Information
           </div>
@@ -86,17 +86,9 @@ export default function Register() {
               <Lock size={16} className="text-gray-400" />
               <input 
                 type={showPassword ? "text" : "password"} 
-                required 
-                name="password" 
-                value={form.password} 
-                onChange={handleChange} 
-                placeholder="Strong password" 
+                required name="password" value={form.password} onChange={handleChange} placeholder="Strong password" 
               />
-              <button 
-                type="button" 
-                className="password-toggle"
-                onClick={() => setShowPassword(!showPassword)}
-              >
+              <button type="button" className="password-toggle" onClick={() => setShowPassword(!showPassword)}>
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
@@ -110,7 +102,6 @@ export default function Register() {
             </div>
           </label>
 
-          {/* Section: Academic Info */}
           <div className="span-2 auth-section-title mt-4">
             <BookOpen size={16} /> Academic Details
           </div>
