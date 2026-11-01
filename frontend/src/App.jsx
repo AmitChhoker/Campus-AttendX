@@ -8,6 +8,7 @@ import Loader from "./components/Loader"; // Apna loader component
 // Auth Pages (Direct Import)
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Recover from "./pages/Recover";
 
 // 🔥 LAZY LOADING: Ye pages tabhi load honge jab jarurat hogi
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
@@ -43,6 +44,7 @@ export default function App() {
     // 🔥 Suspense fallback tab dikhega jab naya page load ho raha hoga
     <Suspense fallback={<div className="loader-full"><Loader /></div>}>
       <Routes>
+         <Route path="/recover" element={<Recover />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/" element={<RoleLanding />} />

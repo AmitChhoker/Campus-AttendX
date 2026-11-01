@@ -1,7 +1,7 @@
 const User = require('../models/User');
 const Otp = require('../models/Otp');
 const { generateOtp } = require('../utils/otp');
-const { sendSms } = require('../utils/sms'); 
+const { sendSms } = require('../utils/sms'); // 🔥 Ab SMS utility use ho rahi hai
 
 // Step 1: User requests OTP using their phone number
 const requestOtp = async (req, res) => {
@@ -14,15 +14,21 @@ const requestOtp = async (req, res) => {
 
         const otp = generateOtp();
 
-        // Remove any previous unexpired OTP for this phone before creating a new one
+        // Purane OTPs delete karein
         await Otp.deleteMany({ phone });
 
+        // Naya OTP database mein save karein
         await Otp.create({ phone, otp, purpose: "account-recovery" });
 
-        await sendSms(phone, `Your SVSU account recovery OTP is ${otp}. Valid for 5 minutes.`);
+        // 🔥 SMS bhejein (Ab Twilio use hoga)
+        const smsMessage = `Your AttendX recovery OTP is ${otp}. It is valid for 5 minutes. Do not share this code.`;
+        
+        await sendSms(phone, smsMessage);
 
-        res.status(200).json({ message: "OTP sent successfully" });
+        res.status(200).json({ message: "OTP sent successfully to your mobile number" });
     } catch (err) {
+        console.error("Recovery Error:", err.message);
+        // Agar Twilio fail hota hai, toh frontend ko wahi error dikhega
         res.status(400).json({ error: err.message });
     }
 };
@@ -39,17 +45,15 @@ const verifyOtp = async (req, res) => {
         const user = await User.findOne({ phone });
         if (!user) throw new Error("User not found");
 
-        // OTP verified - delete it so it can't be reused
+        // OTP verify ho gaya, ab delete kar dein
         await Otp.deleteOne({ _id: otpRecord._id });
 
-        // Reveal masked email, or issue a short-lived reset token instead
+        // Email ko mask karke frontend ko bhejein
         const maskedEmail = user.emailId.replace(/(.{2})(.*)(@.*)/, "$1***$3");
 
         res.status(200).json({
             message: "OTP verified",
             emailId: maskedEmail
-            // Alternative: issue a JWT reset token here instead of showing email directly,
-            // then redirect to a "reset password" screen using that token
         });
     } catch (err) {
         res.status(400).json({ error: err.message });
