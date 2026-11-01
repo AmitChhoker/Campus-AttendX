@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Html5Qrcode } from "html5-qrcode";
 import client from "../../api/client";
-import { QrCode, Bluetooth, ShieldCheck, Fingerprint, CheckCircle, AlertCircle, Loader2, X } from "lucide-react";
+import { QrCode, Bluetooth, ShieldCheck, Fingerprint, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 
 const getStoredDevice = () => {
   let dev = localStorage.getItem("attendx_device");
@@ -35,8 +35,12 @@ export default function StudentMark() {
   const [isCameraLoading, setIsCameraLoading] = useState(false);
   const [scannedData, setScannedData] = useState(null);
   const [error, setError] = useState("");
+  
+  // 🔥 Fingerprint Press State
+  const [isPressing, setIsPressing] = useState(false);
+  const [pressProgress, setPressProgress] = useState(0);
   const [isAuthenticating, setIsAuthenticating] = useState(false); 
-  const [showConfirmModal, setShowConfirmModal] = useState(false); // 🔥 Custom Modal State
+  
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -100,20 +104,44 @@ export default function StudentMark() {
     };
   }, [isScanning]);
 
-  // 🔥 Custom Biometric Flow: Modal open karega, confirm par submit hoga
-  const handleFingerprintClick = () => {
+  // 🔥 FINGERPRINT HOLD LOGIC
+  const startPress = () => {
     if (isAuthenticating) return;
-    setShowConfirmModal(true);
-  };
-
-  const confirmBiometric = async () => {
-    setShowConfirmModal(false);
-    setIsAuthenticating(true);
+    setIsPressing(true);
+    setPressProgress(0);
     setError("");
 
+    let currentProgress = 0;
+    const interval = setInterval(() => {
+      currentProgress += 10;
+      setPressProgress(currentProgress);
+      
+      if (currentProgress >= 100) {
+        clearInterval(interval);
+        executeBiometricAuth();
+      }
+    }, 100); // 1 second hold required
+
+    // Save interval ID to clear it if user releases early
+    window.pressInterval = interval;
+  };
+
+  const endPress = () => {
+    if (isAuthenticating) return;
+    setIsPressing(false);
+    setPressProgress(0);
+    if (window.pressInterval) {
+      clearInterval(window.pressInterval);
+    }
+  };
+
+  const executeBiometricAuth = async () => {
+    setIsAuthenticating(true);
+    setIsPressing(false);
+
     try {
-      // Simulate biometric scanning delay
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Fake delay for visual effect
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       // Generate Proofs & Submit
       const dev = getStoredDevice();
@@ -135,12 +163,11 @@ export default function StudentMark() {
       setStep(5); 
 
     } catch (err) {
-      setError(err.response?.data?.message || err.message || "Failed to mark attendance");
-      setStep(1);
-      setIsScanning(false);
-      setScannedData(null);
+      setError(err.response?.data?.message || err.message || "Failed to mark attendance. Please try again.");
+      // Agar backend error de, toh step 4 par hi rahein
     } finally {
       setIsAuthenticating(false);
+      setPressProgress(0);
     }
   };
 
@@ -233,27 +260,41 @@ export default function StudentMark() {
           </div>
         )}
 
-        {/* STEP 4: CUSTOM BIOMETRIC UI */}
+        {/* 🔥 STEP 4: SIMPLE PRESS & HOLD FINGERPRINT */}
         {step === 4 && (
           <div className="mark-card text-center animate-fade-in">
             <h2 className="text-2xl font-bold mt-2">Biometric Auth</h2>
             
-            {isAuthenticating ? (
-              <p className="text-indigo-500 font-bold animate-pulse mt-2 mb-6">Scanning fingerprint...</p>
-            ) : (
-              <p className="text-muted mt-2 mb-6">Touch the sensor below to verify.</p>
-            )}
+            <p className="text-muted mt-2 mb-6">
+              {isAuthenticating ? "Verifying Fingerprint..." : "Press and hold the sensor below"}
+            </p>
 
             <div 
-              className={`fingerprint-sensor-btn ${isAuthenticating ? 'scanning' : ''}`}
-              onClick={handleFingerprintClick}
+              className={`fingerprint-sensor-btn ${isAuthenticating ? 'scanning' : ''} ${isPressing ? 'pressing' : ''}`}
+              onMouseDown={startPress}
+              onMouseUp={endPress}
+              onMouseLeave={endPress}
+              onTouchStart={startPress}
+              onTouchEnd={endPress}
             >
-              <Fingerprint size={80} className={isAuthenticating ? "text-emerald-500" : "text-indigo-500"} />
-              <div className="fp-laser"></div>
+              <Fingerprint 
+                size={80} 
+                className={isAuthenticating || isPressing ? "text-emerald-500" : "text-indigo-500"} 
+              />
+              
+              {/* Progress circle overlay during press */}
+              {isPressing && (
+                <div 
+                  className="press-progress-ring" 
+                  style={{ background: `conic-gradient(#10b981 ${pressProgress}%, transparent 0)` }}
+                ></div>
+              )}
+
+              {isAuthenticating && <div className="fp-laser"></div>}
             </div>
 
-            <p className="text-xs text-gray-400 mt-6">
-              {isAuthenticating ? "Do not remove your finger" : "Tap the icon above to scan"}
+            <p className="text-xs text-gray-400 mt-6 font-bold">
+              {isAuthenticating ? "Please wait..." : isPressing ? "Keep holding..." : "Touch & Hold to Scan"}
             </p>
           </div>
         )}
@@ -271,35 +312,6 @@ export default function StudentMark() {
           </div>
         )}
       </div>
-
-      {/* 🔥 CUSTOM CONFIRMATION MODAL */}
-      {showConfirmModal && (
-        <div className="custom-modal-backdrop">
-          <div className="custom-modal">
-            <div className="modal-icon-box">
-              <Fingerprint size={48} className="text-indigo-600" />
-            </div>
-            <h3 className="text-xl font-bold text-gray-800 mt-2">Confirm Biometric</h3>
-            <p className="text-gray-500 text-sm mt-2 text-center">
-              Please confirm your fingerprint to mark attendance.
-            </p>
-            <div className="flex gap-3 w-full mt-6">
-              <button 
-                className="btn btn-ghost flex-1" 
-                onClick={() => setShowConfirmModal(false)}
-              >
-                Cancel
-              </button>
-              <button 
-                className="btn btn-primary flex-1" 
-                onClick={confirmBiometric}
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
