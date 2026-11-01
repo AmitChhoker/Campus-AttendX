@@ -99,7 +99,7 @@ export default function StudentMark() {
     };
   }, [isScanning]);
 
-  // 🔥 Yahan fingerprint scan trigger hoga jab user icon par click karega
+  // 🔥 STRICT FINGERPRINT SCAN (No Bypass Allowed)
   const handleFingerprintClick = async () => {
     if (isAuthenticating) return;
     
@@ -107,32 +107,32 @@ export default function StudentMark() {
     setIsAuthenticating(true);
 
     try {
-      // 1. Agar device support karta hai toh OS ka real biometric popup try karo
-      if (window.PublicKeyCredential) {
-        try {
-          const challenge = new Uint8Array(32);
-          window.crypto.getRandomValues(challenge);
-          await navigator.credentials.get({
-            publicKey: {
-              challenge: challenge,
-              timeout: 5000, // 5 sec timeout so it doesn't hang
-              userVerification: "required",
-            }
-          });
-        } catch (err) {
-          console.log("Native biometric prompt skipped:", err.message);
-        }
+      // 1. Force OS Biometric Prompt
+      if (!window.PublicKeyCredential) {
+        throw new Error("Biometric authentication is not supported on this device.");
       }
 
-      // 2. Visual scanning delay (taaki user ko lage scan ho raha hai)
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const challenge = new Uint8Array(32);
+      window.crypto.getRandomValues(challenge);
+      
+      // Agar user cancel karega ya fail hoga, toh ye error throw karega
+      await navigator.credentials.get({
+        publicKey: {
+          challenge: challenge,
+          timeout: 60000,
+          userVerification: "required", // Forces biometric
+        }
+      });
+
+      // 2. Visual scanning delay (Only runs if biometric PASSES)
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       // 3. Generate Proofs & Submit
       const dev = getStoredDevice();
-      const challenge = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
+      const challengeString = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
       
-      const deviceProof = await generateProof(dev.deviceKey, "device:", challenge);
-      const fingerprintProof = await generateProof(dev.deviceKey, "fingerprint:", challenge);
+      const deviceProof = await generateProof(dev.deviceKey, "device:", challengeString);
+      const fingerprintProof = await generateProof(dev.deviceKey, "fingerprint:", challengeString);
 
       await client.post("/student/scan-attendance/scan", {
         sessionId: scannedData.sessionId,
@@ -147,10 +147,10 @@ export default function StudentMark() {
       setStep(5); 
 
     } catch (err) {
-      setError(err.response?.data?.message || err.message || "Failed to mark attendance");
-      setStep(1);
-      setIsScanning(false);
-      setScannedData(null);
+      // 🔥 Agar biometric fail hua toh yahan error aayega aur submit nahi hoga
+      console.error("Biometric Error:", err);
+      setError(err.message || "Fingerprint authentication failed or cancelled.");
+      // Step 4 par hi rahenge taaki dobara try kar sake
     } finally {
       setIsAuthenticating(false);
     }
@@ -245,7 +245,7 @@ export default function StudentMark() {
           </div>
         )}
 
-        {/* 🔥 STEP 4: INTERACTIVE FINGERPRINT SCANNER */}
+        {/* STEP 4: STRICT FINGERPRINT */}
         {step === 4 && (
           <div className="mark-card text-center animate-fade-in">
             <h2 className="text-2xl font-bold mt-2">Biometric Auth</h2>
@@ -256,7 +256,6 @@ export default function StudentMark() {
               <p className="text-muted mt-2 mb-6">Touch the sensor below to verify.</p>
             )}
 
-            {/* Big Interactive Fingerprint Button */}
             <div 
               className={`fingerprint-sensor-btn ${isAuthenticating ? 'scanning' : ''}`}
               onClick={handleFingerprintClick}
