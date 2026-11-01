@@ -126,50 +126,21 @@ const getStudentDashboard = async ({
     }
 
     // ==================================================
-    // 4. Get Completed Attendance Sessions
+    // 4. Get All Attendance Sessions (Including Active)
     // ==================================================
 
     const subjectIds = subjects.map(
         subject => subject._id
     );
 
-    /*
-       Count sessions that have finished.
-
-       A session is considered finished when:
-       1. Its status is "closed".
-       2. Its status is "expired".
-       3. It is still marked "active", but its expiry
-          time has already passed.
-
-       Sessions that are still active and unexpired
-       are not counted yet.
-    */
-
+    // 🔥 FIX: Ab hum active sessions ko bhi count karenge taaki turant reflect ho
     const sessions = await AttendanceSession.find({
-
         subject: {
             $in: subjectIds
         },
-
         startedAt: {
             $lt: now
-        },
-
-        $or: [
-            {
-                status: {
-                    $in: ["closed", "expired"]
-                }
-            },
-            {
-                status: "active",
-                expiresAt: {
-                    $lte: now
-                }
-            }
-        ]
-
+        }
     }).select(
         "_id subject startedAt expiresAt status"
     );

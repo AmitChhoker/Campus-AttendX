@@ -28,19 +28,12 @@ app.use(cors({
 }));
 
 // ==========================================
-// CACHE DISABLE (304 Error se bachne ke liye)
+// 🔥 CACHE DISABLE (Har baar fresh data aayega)
 // ==========================================
-// 🔥 API Caching (Instant Loads)
 app.use((req, res, next) => {
-    // Auth aur sensitive routes par NO-CACHE rakhein
-    if (req.path.includes("/auth") || req.path.includes("/profile")) {
-        res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    } else {
-        // Baaki GET requests ko 30 seconds ke liye cache karein
-        if (req.method === "GET") {
-            res.set("Cache-Control", "public, max-age=30");
-        }
-    }
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.set("Pragma", "no-cache");
+    res.set("Expires", "0");
     next();
 });
 
@@ -82,7 +75,7 @@ const studentAttendanceRouter = require("./src/routes/student/studentAttendance.
 const studentSubjectsRouter = require("./src/routes/student/studentSubjects.routes");
 const studentNotificationRouter = require("./src/routes/student/studentNotification.routes");
 const studentSettingsRouter = require("./src/routes/student/studentSettings.routes");
-const studentScanAttendanceRouter = require("./src/routes/student/studentScanAttendance.routes"); // <-- Scan Route
+const studentScanAttendanceRouter = require("./src/routes/student/studentScanAttendance.routes");
 const studentDeviceRouter = require("./src/routes/student/studentDevice.routes");
 const studentRoutes = require("./src/routes/student/student.routes"); 
 
@@ -115,7 +108,7 @@ app.use("/api/student/subjects", studentSubjectsRouter);
 app.use("/api/student/notifications", studentNotificationRouter);
 app.use("/api/student/settings", studentSettingsRouter);
 
-// 🔥 SCAN ATTENDANCE ROUTE
+// SCAN ATTENDANCE ROUTE
 app.use("/api/student/scan-attendance", studentScanAttendanceRouter);
 
 app.use("/api/student/device", studentDeviceRouter);

@@ -29,18 +29,13 @@ const STEPS = [
   { id: 4, label: "Biometric", icon: Fingerprint }
 ];
 
-// 🔥 SMART BIOMETRIC FUNCTION
+// 🔥 Smart Biometric (No blocking alert)
+// Mark.jsx mein sirf is function ko check karein:
 const authenticateBiometric = async () => {
   try {
-    // Check if browser supports WebAuthn
-    if (!window.PublicKeyCredential) {
-      throw new Error("WebAuthn not supported");
-    }
-
+    if (!window.PublicKeyCredential) return; // Skip if unsupported
     const challenge = new Uint8Array(32);
     window.crypto.getRandomValues(challenge);
-    
-    // Attempt to trigger OS Biometric
     await navigator.credentials.get({
       publicKey: {
         challenge: challenge,
@@ -48,15 +43,8 @@ const authenticateBiometric = async () => {
         userVerification: "required",
       }
     });
-    return true;
   } catch (err) {
-    console.warn("Biometric hardware error:", err.message);
-    
-    // 🔥 FALLBACK: If biometric fails (no fingerprint registered, cancelled, or not supported)
-    const userConfirmed = window.confirm(
-      "Biometric scan failed or unavailable.\n\nClick OK to manually confirm your attendance."
-    );
-    return userConfirmed; // Returns true if user clicked OK
+    console.warn("Biometric skipped/failed:", err.message);
   }
 };
 
@@ -136,13 +124,10 @@ export default function StudentMark() {
       if (!scannedData) throw new Error("No QR data found. Please scan again.");
       setIsAuthenticating(true); 
       
-      // 🔥 Call the smart biometric function
-      const isAuthenticated = await authenticateBiometric();
+      // 1. Try Biometric (Non-blocking)
+      await authenticateBiometric();
       
-      if (!isAuthenticated) {
-        throw new Error("Authentication cancelled by user.");
-      }
-      
+      // 2. Generate Proofs & Submit
       const dev = getStoredDevice();
       const challenge = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
       
@@ -172,8 +157,6 @@ export default function StudentMark() {
 
   return (
     <div className="mark-container pb-20">
-      
-      {/* MODERN STEPPER */}
       <div className="modern-stepper-wrapper">
         {STEPS.map((s, i) => {
           const isActive = step === s.id;
@@ -192,7 +175,6 @@ export default function StudentMark() {
         })}
       </div>
 
-      {/* ERROR MESSAGE */}
       {error && (
         <div className="error-banner animate-slide-down">
           <AlertCircle size={20} />
@@ -200,10 +182,7 @@ export default function StudentMark() {
         </div>
       )}
 
-      {/* CONTENT AREA */}
       <div className="mark-content-area">
-        
-        {/* STEP 1: SCAN */}
         {step === 1 && (
           <div className="mark-card animate-fade-in">
             <div className="mark-header">
@@ -239,7 +218,6 @@ export default function StudentMark() {
           </div>
         )}
 
-        {/* STEP 2: BLE */}
         {step === 2 && (
           <div className="mark-card text-center animate-fade-in">
             <div className="success-icon-box bg-blue-100 text-blue-600">
@@ -253,7 +231,6 @@ export default function StudentMark() {
           </div>
         )}
 
-        {/* STEP 3: DEVICE */}
         {step === 3 && (
           <div className="mark-card text-center animate-fade-in">
             <div className="success-icon-box bg-emerald-100 text-emerald-600">
@@ -267,7 +244,6 @@ export default function StudentMark() {
           </div>
         )}
 
-        {/* STEP 4: BIOMETRIC */}
         {step === 4 && (
           <div className="mark-card text-center animate-fade-in">
             <div className={`fingerprint-scanner ${isAuthenticating ? 'active' : ''}`}>
@@ -292,7 +268,6 @@ export default function StudentMark() {
           </div>
         )}
 
-        {/* STEP 5: SUCCESS */}
         {step === 5 && (
           <div className="mark-card text-center animate-fade-in">
             <div className="success-icon-box bg-emerald-100 text-emerald-500 pop-animation">
@@ -305,7 +280,6 @@ export default function StudentMark() {
             </button>
           </div>
         )}
-
       </div>
     </div>
   );
