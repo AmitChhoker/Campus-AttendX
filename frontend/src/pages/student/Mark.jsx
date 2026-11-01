@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Html5Qrcode } from "html5-qrcode";
 import client from "../../api/client";
-import { QrCode, Bluetooth, ShieldCheck, Fingerprint, CheckCircle, AlertCircle, FingerprintIcon } from "lucide-react";
+import { QrCode, Bluetooth, ShieldCheck, Fingerprint, CheckCircle, AlertCircle } from "lucide-react";
 
 const getStoredDevice = () => {
   let dev = localStorage.getItem("attendx_device");
@@ -29,49 +29,19 @@ const STEPS = [
   { id: 4, label: "Biometric", icon: Fingerprint }
 ];
 
-// 🔥 WebAuthn Helper Functions
-const registerBiometric = async () => {
-  if (!window.PublicKeyCredential) {
-    alert("Biometrics not supported on this browser.");
-    return false;
-  }
-  try {
-    const challenge = new Uint8Array(32);
-    window.crypto.getRandomValues(challenge);
-    const user = { id: new Uint8Array(16), name: "student@svsu.ac.in", displayName: "Student" };
-    
-    await navigator.credentials.create({
-      publicKey: {
-        challenge: challenge,
-        rp: { name: "AttendX", id: window.location.hostname },
-        user: user,
-        pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-        authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
-        timeout: 60000,
-      }
-    });
-    return true;
-  } catch (err) {
-    console.error("Registration failed", err);
-    return false;
-  }
-};
-
 const authenticateBiometric = async () => {
   try {
     const challenge = new Uint8Array(32);
     window.crypto.getRandomValues(challenge);
-    
     await navigator.credentials.get({
       publicKey: {
         challenge: challenge,
         timeout: 60000,
-        userVerification: "required", // OS Sensor popup trigger karega
+        userVerification: "required",
       }
     });
     return true;
   } catch (err) {
-    console.error("Auth failed", err);
     return false;
   }
 };
@@ -93,7 +63,6 @@ export default function StudentMark() {
 
   useEffect(() => {
     if (!isScanning) return;
-    
     let scanner = null;
     let isMounted = true;
 
@@ -110,7 +79,6 @@ export default function StudentMark() {
               scanner = null;
             }
             if (!isMounted) return;
-
             try {
               const parsed = JSON.parse(decodedText);
               if (parsed.sessionId && parsed.window !== undefined && parsed.qrToken) {
@@ -134,9 +102,7 @@ export default function StudentMark() {
         setIsScanning(false);
       }
     };
-
     startScanner();
-
     return () => {
       isMounted = false;
       if (scanner) scanner.stop().catch(() => {});
@@ -147,26 +113,10 @@ export default function StudentMark() {
     try {
       setError("");
       if (!scannedData) throw new Error("No QR data found. Please scan again.");
-      
       setIsAuthenticating(true); 
-
-      // 1. Check if browser supports WebAuthn
-      if (window.PublicKeyCredential) {
-        // 2. Try to authenticate (This triggers the OS Fingerprint/FaceID)
-        const isAuthenticated = await authenticateBiometric();
-        
-        // 3. If OS prompt fails (maybe not registered yet), we register it now
-        if (!isAuthenticated) {
-           const registered = await registerBiometric();
-           if(!registered) {
-             throw new Error("Biometric authentication failed or cancelled.");
-           }
-        }
-      } else {
-         // Fallback for unsupported browsers
-         const userConfirmed = window.confirm("Biometric not supported. Click OK to simulate fingerprint.");
-         if(!userConfirmed) throw new Error("Biometric cancelled.");
-      }
+      
+      const isAuthenticated = await authenticateBiometric();
+      if (!isAuthenticated) throw new Error("Biometric authentication failed or cancelled.");
       
       const dev = getStoredDevice();
       const challenge = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
@@ -187,7 +137,6 @@ export default function StudentMark() {
       setStep(5); 
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Failed to mark attendance");
-      // Reset to step 1 if auth fails
       setStep(1);
       setIsScanning(false);
       setScannedData(null);
@@ -198,12 +147,10 @@ export default function StudentMark() {
 
   return (
     <div className="scan-dashboard pb-20">
-      
       <div className="modern-stepper">
         {STEPS.map((s, i) => {
           const isActive = step === s.id;
           const isCompleted = step > s.id;
-          
           return (
             <div key={s.id} className="stepper-item">
               <div className={`stepper-circle ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}>
@@ -218,7 +165,7 @@ export default function StudentMark() {
 
       <div className="scan-content">
         {error && (
-          <div className="error-box glass-panel mb-4">
+          <div className="error-box glass-panel mb-4 flex items-center gap-2">
             <AlertCircle size={20} />
             <span>{error}</span>
           </div>
@@ -228,7 +175,6 @@ export default function StudentMark() {
           <div className="glass-panel text-center animate-fade-in">
             <h2 className="text-2xl font-bold mb-2">Scan Attendance QR</h2>
             <p className="text-muted mb-6">Position the QR code inside the frame</p>
-            
             <div className={`scanner-container ${isScanning ? 'scanning' : ''}`}>
               {!isScanning ? (
                 <div className="scanner-placeholder" onClick={() => { setError(""); setIsScanning(true); }}>
@@ -240,7 +186,6 @@ export default function StudentMark() {
               )}
               <div className="scan-laser"></div>
             </div>
-            
             {isScanning && (
               <button className="btn btn-ghost mt-4 w-full" onClick={() => setIsScanning(false)}>Cancel</button>
             )}
@@ -249,24 +194,18 @@ export default function StudentMark() {
 
         {step === 2 && (
           <div className="glass-panel text-center animate-fade-in">
-            <div className="icon-pulse-ring">
-              <Bluetooth size={48} className="text-indigo-500" />
-            </div>
+            <div className="icon-pulse-ring"><Bluetooth size={48} className="text-indigo-500" /></div>
             <h2 className="text-2xl font-bold mb-2">BLE Verification</h2>
             <p className="text-green-500 font-semibold mb-6">✓ QR Code Verified</p>
-            <p className="text-muted mb-6">Scanning for teacher's bluetooth beacon...</p>
             <button className="btn btn-primary w-full" onClick={() => setStep(3)}>Confirm Proximity</button>
           </div>
         )}
 
         {step === 3 && (
           <div className="glass-panel text-center animate-fade-in">
-             <div className="icon-pulse-ring">
-              <ShieldCheck size={48} className="text-green-500" />
-            </div>
+             <div className="icon-pulse-ring"><ShieldCheck size={48} className="text-green-500" /></div>
             <h2 className="text-2xl font-bold mb-2">Device Check</h2>
             <p className="text-green-500 font-semibold mb-6">✓ Device Authenticated</p>
-            <p className="text-muted mb-6">Your unique device signature matches our records.</p>
             <button className="btn btn-primary w-full" onClick={() => setStep(4)}>Continue to Biometric</button>
           </div>
         )}
@@ -277,19 +216,13 @@ export default function StudentMark() {
               <Fingerprint size={80} className="text-indigo-500" />
               <div className="fingerprint-laser"></div>
             </div>
-            
             <h2 className="text-2xl font-bold mb-2">Biometric Auth</h2>
             {isAuthenticating ? (
-              <p className="text-indigo-500 font-bold animate-pulse mb-6">Waiting for OS Biometric prompt...</p>
+              <p className="text-indigo-500 font-bold animate-pulse mb-6">Waiting for OS Biometric...</p>
             ) : (
-              <p className="text-muted mb-6">Tap below to trigger your device's fingerprint / FaceID.</p>
+              <p className="text-muted mb-6">Tap below to authenticate.</p>
             )}
-
-            <button 
-              className="btn btn-primary w-full" 
-              onClick={handleFinalSubmit}
-              disabled={isAuthenticating}
-            >
+            <button className="btn btn-primary w-full" onClick={handleFinalSubmit} disabled={isAuthenticating}>
               {isAuthenticating ? "Authenticating..." : "Authenticate & Submit"}
             </button>
           </div>
@@ -297,14 +230,9 @@ export default function StudentMark() {
 
         {step === 5 && (
           <div className="glass-panel text-center animate-fade-in success-panel">
-            <div className="success-checkmark">
-              <CheckCircle size={80} className="text-green-500" />
-            </div>
+            <div className="success-checkmark"><CheckCircle size={80} className="text-green-500" /></div>
             <h2 className="text-2xl font-bold text-green-500 mb-2">Attendance Marked!</h2>
-            <p className="text-muted mb-6">Your presence has been successfully recorded.</p>
-            <button className="btn btn-primary w-full" onClick={() => navigate("/student")}>
-              Back to Dashboard
-            </button>
+            <button className="btn btn-primary w-full mt-4" onClick={() => navigate("/student")}>Back to Dashboard</button>
           </div>
         )}
       </div>

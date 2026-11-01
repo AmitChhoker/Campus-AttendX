@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { 
   LayoutDashboard, Users, BookOpen, FileText, Settings, LogOut, 
@@ -23,8 +23,9 @@ export default function Layout() {
       { to: "/faculty", icon: LayoutDashboard, label: "Dashboard" },
       { to: "/faculty/courses", icon: BookOpen, label: "Courses" },
       { to: "/faculty/sessions", icon: ClipboardList, label: "Sessions" },
-      { to: "/faculty/reports", icon: FileText, label: "Reports" }
-      // 🔥 Faculty side bar se Profile hata diya hai
+      { to: "/faculty/reports", icon: FileText, label: "Reports" },
+      // 🔥 Wapas add kar diya
+      { to: "/faculty/profile", icon: User, label: "Profile" } 
     ],
     student: [
       { to: "/student", icon: Home, label: "Home" },
@@ -35,8 +36,6 @@ export default function Layout() {
   };
 
   const items = navItems[user.role] || [];
-
-  // Profile route logic based on role
   const profilePath = user.role === "admin" ? "/admin/settings" : `/${user.role}/profile`;
 
   return (
@@ -70,7 +69,7 @@ export default function Layout() {
           </div>
           
           <div className="topbar-right">
-             {/* 🔥 Avatar clickable ho gaya hai */}
+             {/* Avatar clickable hai profile ke liye */}
              <div 
                className="avatar cursor-pointer hover:scale-105 transition-transform" 
                onClick={() => navigate(profilePath)}
@@ -93,12 +92,6 @@ export default function Layout() {
               <span>{item.label}</span>
             </NavLink>
           ))}
-          
-          {/* Mobile Bottom tab mein Profile add karein taaki mobile pe bhi access ho sake */}
-          <NavLink to={profilePath} className={({ isActive }) => `bottom-tab ${isActive ? "active" : ""}`}>
-            <User size={22} />
-            <span>Profile</span>
-          </NavLink>
         </div>
       </div>
     </div>

@@ -1484,3 +1484,84 @@ p  { margin: 0.25rem 0; }
   place-items: center;
   color: #64748b;
 }
+
+/* =========================================
+   STUDENT DASHBOARD & UI ENHANCEMENTS
+   ========================================= */
+
+.student-header-banner {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  padding: 1.5rem;
+  border-radius: 20px;
+  box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);
+}
+
+.hero-card-modern {
+  padding: 1.5rem;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+}
+
+.hero-card-modern.safe { background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 100%); border-color: #a7f3d0; }
+.hero-card-modern.risk { background: linear-gradient(180deg, #fef2f2 0%, #ffffff 100%); border-color: #fecaca; }
+
+/* Circular Progress */
+.progress-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: conic-gradient(var(--color) var(--percent), #e2e8f0 0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progress-circle-inner {
+  width: 65px;
+  height: 65px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Subject List Items */
+.subject-list-item {
+  padding: 1rem;
+  border-radius: 12px;
+  background: white;
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.subject-list-item:hover {
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  transform: translateY(-2px);
+}
+
+.subject-list-item.border-red-200 { border-left-color: var(--red); }
+.subject-list-item.border-emerald-200 { border-left-color: var(--emerald); }
+
+.icon-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1.2rem;
+}
+
+/* Meta Badges */
+.meta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
