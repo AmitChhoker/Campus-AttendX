@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Html5Qrcode } from "html5-qrcode";
 import client from "../../api/client";
-import { QrCode, Bluetooth, ShieldCheck, Fingerprint, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { QrCode, Bluetooth, ShieldCheck, Fingerprint, CheckCircle, AlertCircle, Loader2, X } from "lucide-react";
 
 const getStoredDevice = () => {
   let dev = localStorage.getItem("attendx_device");
@@ -36,19 +36,8 @@ export default function StudentMark() {
   const [scannedData, setScannedData] = useState(null);
   const [error, setError] = useState("");
   const [isAuthenticating, setIsAuthenticating] = useState(false); 
-  const [biometricAvailable, setBiometricAvailable] = useState(true); // 🔥 New state
+  const [showConfirmModal, setShowConfirmModal] = useState(false); // 🔥 Custom Modal State
   const navigate = useNavigate();
-
-  useEffect(() => {
-    // 🔥 Check if device supports biometrics
-    if (window.PublicKeyCredential) {
-      window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
-        .then((available) => setBiometricAvailable(available))
-        .catch(() => setBiometricAvailable(false));
-    } else {
-      setBiometricAvailable(false);
-    }
-  }, []);
 
   useEffect(() => {
     try {
@@ -111,33 +100,20 @@ export default function StudentMark() {
     };
   }, [isScanning]);
 
-  // 🔥 Handle Biometric Click
-  const handleFingerprintClick = async () => {
+  // 🔥 Custom Biometric Flow: Modal open karega, confirm par submit hoga
+  const handleFingerprintClick = () => {
     if (isAuthenticating) return;
-    setError("");
+    setShowConfirmModal(true);
+  };
+
+  const confirmBiometric = async () => {
+    setShowConfirmModal(false);
     setIsAuthenticating(true);
+    setError("");
 
     try {
-      if (biometricAvailable) {
-        // Trigger OS Biometric
-        const challenge = new Uint8Array(32);
-        window.crypto.getRandomValues(challenge);
-        
-        await navigator.credentials.get({
-          publicKey: {
-            challenge: challenge,
-            timeout: 60000,
-            userVerification: "required",
-          }
-        });
-      } else {
-        // Fallback for devices without biometric hardware
-        const confirm = window.confirm("Biometric not available on this device. Click OK to manually confirm attendance.");
-        if (!confirm) throw new Error("Authentication cancelled.");
-      }
-
-      // Visual delay
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Simulate biometric scanning delay
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Generate Proofs & Submit
       const dev = getStoredDevice();
@@ -159,8 +135,10 @@ export default function StudentMark() {
       setStep(5); 
 
     } catch (err) {
-      console.error("Auth Error:", err);
-      setError(err.message || "Authentication failed or cancelled. Please try again.");
+      setError(err.response?.data?.message || err.message || "Failed to mark attendance");
+      setStep(1);
+      setIsScanning(false);
+      setScannedData(null);
     } finally {
       setIsAuthenticating(false);
     }
@@ -255,7 +233,7 @@ export default function StudentMark() {
           </div>
         )}
 
-        {/* STEP 4: BIOMETRIC */}
+        {/* STEP 4: CUSTOM BIOMETRIC UI */}
         {step === 4 && (
           <div className="mark-card text-center animate-fade-in">
             <h2 className="text-2xl font-bold mt-2">Biometric Auth</h2>
@@ -263,9 +241,7 @@ export default function StudentMark() {
             {isAuthenticating ? (
               <p className="text-indigo-500 font-bold animate-pulse mt-2 mb-6">Scanning fingerprint...</p>
             ) : (
-              <p className="text-muted mt-2 mb-6">
-                {biometricAvailable ? "Touch the sensor below to verify." : "Biometric not available. Click below to confirm."}
-              </p>
+              <p className="text-muted mt-2 mb-6">Touch the sensor below to verify.</p>
             )}
 
             <div 
@@ -295,6 +271,35 @@ export default function StudentMark() {
           </div>
         )}
       </div>
+
+      {/* 🔥 CUSTOM CONFIRMATION MODAL */}
+      {showConfirmModal && (
+        <div className="custom-modal-backdrop">
+          <div className="custom-modal">
+            <div className="modal-icon-box">
+              <Fingerprint size={48} className="text-indigo-600" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-800 mt-2">Confirm Biometric</h3>
+            <p className="text-gray-500 text-sm mt-2 text-center">
+              Please confirm your fingerprint to mark attendance.
+            </p>
+            <div className="flex gap-3 w-full mt-6">
+              <button 
+                className="btn btn-ghost flex-1" 
+                onClick={() => setShowConfirmModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary flex-1" 
+                onClick={confirmBiometric}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
