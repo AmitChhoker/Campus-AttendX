@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Html5Qrcode } from "html5-qrcode";
 import client from "../../api/client";
-import { QrCode, Bluetooth, ShieldCheck, Fingerprint, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { QrCode, Bluetooth, ShieldCheck, Fingerprint, CheckCircle, AlertCircle, Loader2, X } from "lucide-react";
 
 const getStoredDevice = () => {
   let dev = localStorage.getItem("attendx_device");
@@ -30,62 +30,52 @@ const generateProof = async (secret, prefix, challenge) => {
   return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
 };
 
-// ==========================================
-// 🔐 WebAuthn Helpers (Real OS Biometrics)
-// ==========================================
-
-const registerBiometric = async (deviceId) => {
-  if (!window.PublicKeyCredential) {
-    throw new Error("Biometric authentication is not supported on this device/browser.");
-  }
-
-  const challenge = window.crypto.getRandomValues(new Uint8Array(32));
-  const userId = window.crypto.getRandomValues(new Uint8Array(16));
-
+// 🔐 Check if device supports native biometrics
+const isPlatformAuthenticatorAvailable = async () => {
+  if (!window.PublicKeyCredential) return false;
   try {
-    const credential = await navigator.credentials.create({
-      publicKey: {
-        challenge,
-        rp: { name: "AttendX", id: window.location.hostname },
-        user: {
-          id: userId,
-          name: deviceId,
-          displayName: "Student",
-        },
-        pubKeyCredParams: [
-          { alg: -7, type: "public-key" },  // ES256
-          { alg: -257, type: "public-key" }, // RS256
-        ],
-        authenticatorSelection: {
-          authenticatorAttachment: "platform", 
-          userVerification: "required",        
-        },
-        timeout: 60000,
-        attestation: "none",
-      },
-    });
-
-    if (!credential) throw new Error("Biometric enrollment was cancelled.");
-
-    const credId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
-    localStorage.setItem("attendx_biometric_cred", credId);
-    return credId;
-  } catch (err) {
-    if (err.name === "NotAllowedError") {
-      throw new Error("Fingerprint/FaceID setup was cancelled. Please try again.");
-    }
-    throw err;
+    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+  } catch {
+    return false;
   }
 };
 
-const performBiometricVerification = async (deviceId) => {
-  if (!window.PublicKeyCredential) {
-    throw new Error("Biometric authentication is not supported on this device/browser.");
-  }
+// 🔐 Register credential (first time only)
+const registerBiometric = async (deviceId) => {
+  const challenge = window.crypto.getRandomValues(new Uint8Array(32));
+  const userId = window.crypto.getRandomValues(new Uint8Array(16));
 
+  const credential = await navigator.credentials.create({
+    publicKey: {
+      challenge,
+      rp: { name: "AttendX", id: window.location.hostname },
+      user: {
+        id: userId,
+        name: deviceId,
+        displayName: "Student",
+      },
+      pubKeyCredParams: [
+        { alg: -7, type: "public-key" },
+        { alg: -257, type: "public-key" },
+      ],
+      authenticatorSelection: {
+        authenticatorAttachment: "platform",
+        userVerification: "required",
+      },
+      timeout: 60000,
+      attestation: "none",
+    },
+  });
+
+  if (!credential) throw new Error("Biometric enrollment was cancelled.");
+  const credId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
+  localStorage.setItem("attendx_biometric_cred", credId);
+  return credId;
+};
+
+// 🔐 Verify using real OS sensor
+const performBiometricVerification = async (deviceId) => {
   let credIdB64 = localStorage.getItem("attendx_biometric_cred");
-  
-  // Agar pehli baar hai, toh register karo
   if (!credIdB64) {
     credIdB64 = await registerBiometric(deviceId);
   }
@@ -93,7 +83,6 @@ const performBiometricVerification = async (deviceId) => {
   const credId = Uint8Array.from(atob(credIdB64), (c) => c.charCodeAt(0));
 
   try {
-    // Ye line OS ka biometric popup trigger karegi
     return await navigator.credentials.get({
       publicKey: {
         challenge: window.crypto.getRandomValues(new Uint8Array(32)),
@@ -103,15 +92,14 @@ const performBiometricVerification = async (deviceId) => {
       },
     });
   } catch (err) {
+    // Agar user cancel kare ya timeout ho, toh fallback modal dikhega
     if (err.name === "NotAllowedError") {
-      throw new Error("Biometric verification was cancelled or timed out.");
+      throw new Error("Biometric cancelled. Please use manual confirmation.");
     }
-    
-    // Agar credential stale ho gaya hai (jaise phone ka lock change hua), toh re-register karo
+    // Credential stale ho gaya ho toh re-register karo
     localStorage.removeItem("attendx_biometric_cred");
     credIdB64 = await registerBiometric(deviceId);
     const newCredId = Uint8Array.from(atob(credIdB64), (c) => c.charCodeAt(0));
-    
     return await navigator.credentials.get({
       publicKey: {
         challenge: window.crypto.getRandomValues(new Uint8Array(32)),
@@ -137,8 +125,15 @@ export default function StudentMark() {
   const [scannedData, setScannedData] = useState(null);
   const [error, setError] = useState("");
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [showFallbackModal, setShowFallbackModal] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(null);
 
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // 🔥 Check biometric availability once on mount
+    isPlatformAuthenticatorAvailable().then(setBiometricAvailable);
+  }, []);
 
   useEffect(() => {
     try {
@@ -201,7 +196,26 @@ export default function StudentMark() {
     };
   }, [isScanning]);
 
-  // 🔥 Trigger Real OS Sensor
+  // 🔥 Submit attendance (used by both biometric and fallback)
+  const submitAttendance = async (device) => {
+    const challengeString = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
+    const deviceProof = await generateProof(device.deviceKey, "device:", challengeString);
+    const fingerprintProof = await generateProof(device.deviceKey, "fingerprint:", challengeString);
+
+    await client.post("/student/scan-attendance/scan", {
+      sessionId: scannedData.sessionId,
+      window: scannedData.window,
+      qrToken: scannedData.qrToken,
+      deviceId: device.deviceId,
+      deviceProof,
+      fingerprintProof,
+      bleRssi: -55,
+    });
+
+    setStep(5);
+  };
+
+  // 🔥 Trigger biometric (with fallback)
   const startBiometric = async () => {
     if (isAuthenticating) return;
     setIsAuthenticating(true);
@@ -210,31 +224,39 @@ export default function StudentMark() {
     try {
       const dev = getStoredDevice();
 
-      // 1. Trigger OS Fingerprint/FaceID prompt
+      // Agar biometric support nahi hai toh direct fallback dikhao
+      if (!biometricAvailable) {
+        setShowFallbackModal(true);
+        return;
+      }
+
+      // Native biometric trigger karo
       await performBiometricVerification(dev.deviceId);
+      await submitAttendance(dev);
 
-      // 2. Generate Proofs & Submit
-      const challengeString = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
-      const deviceProof = await generateProof(dev.deviceKey, "device:", challengeString);
-      const fingerprintProof = await generateProof(dev.deviceKey, "fingerprint:", challengeString);
-
-      await client.post("/student/scan-attendance/scan", {
-        sessionId: scannedData.sessionId,
-        window: scannedData.window,
-        qrToken: scannedData.qrToken,
-        deviceId: dev.deviceId,
-        deviceProof,
-        fingerprintProof,
-        bleRssi: -55,
-      });
-
-      setStep(5);
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to mark attendance. Please try again."
-      );
+      if (err.message.includes("cancelled")) {
+        // Agar user ne cancel kiya toh fallback modal dikhao
+        setShowFallbackModal(true);
+      } else {
+        setError(err.response?.data?.message || err.message || "Failed to mark attendance.");
+      }
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  // 🔥 Fallback: Manual confirmation
+  const confirmFallback = async () => {
+    setShowFallbackModal(false);
+    setIsAuthenticating(true);
+    setError("");
+
+    try {
+      const dev = getStoredDevice();
+      await submitAttendance(dev);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Failed to mark attendance.");
     } finally {
       setIsAuthenticating(false);
     }
@@ -242,6 +264,7 @@ export default function StudentMark() {
 
   return (
     <div className="mark-container pb-20">
+      {/* Stepper UI */}
       <div className="modern-stepper-wrapper">
         {STEPS.map((s, i) => {
           const isActive = step === s.id;
@@ -260,6 +283,7 @@ export default function StudentMark() {
         })}
       </div>
 
+      {/* Error Banner */}
       {error && (
         <div className="error-banner animate-slide-down">
           <AlertCircle size={20} />
@@ -268,6 +292,7 @@ export default function StudentMark() {
       )}
 
       <div className="mark-content-area">
+        {/* Step 1: QR Scan */}
         {step === 1 && (
           <div className="mark-card animate-fade-in">
             <div className="mark-header">
@@ -278,9 +303,7 @@ export default function StudentMark() {
             <div className={`camera-wrapper ${isScanning ? "active" : ""}`}>
               {!isScanning ? (
                 <div className="camera-placeholder" onClick={() => setIsScanning(true)}>
-                  <div className="scan-icon-box">
-                    <QrCode size={48} />
-                  </div>
+                  <div className="scan-icon-box"><QrCode size={48} /></div>
                   <button className="btn btn-primary mt-4">Open Camera</button>
                 </div>
               ) : (
@@ -298,48 +321,38 @@ export default function StudentMark() {
             </div>
 
             {isScanning && (
-              <button className="btn btn-ghost full mt-4" onClick={() => setIsScanning(false)}>
-                Cancel
-              </button>
+              <button className="btn btn-ghost full mt-4" onClick={() => setIsScanning(false)}>Cancel</button>
             )}
           </div>
         )}
 
+        {/* Step 2: BLE */}
         {step === 2 && (
           <div className="mark-card text-center animate-fade-in">
-            <div className="success-icon-box bg-blue-100 text-blue-600">
-              <Bluetooth size={48} />
-            </div>
+            <div className="success-icon-box bg-blue-100 text-blue-600"><Bluetooth size={48} /></div>
             <h2 className="text-2xl font-bold mt-4">BLE Verification</h2>
             <p className="text-green-500 font-semibold mt-1 mb-6">✓ QR Code Verified</p>
-            <button className="btn btn-primary full" onClick={() => setStep(3)}>
-              Confirm Proximity
-            </button>
+            <button className="btn btn-primary full" onClick={() => setStep(3)}>Confirm Proximity</button>
           </div>
         )}
 
+        {/* Step 3: Device */}
         {step === 3 && (
           <div className="mark-card text-center animate-fade-in">
-            <div className="success-icon-box bg-emerald-100 text-emerald-600">
-              <ShieldCheck size={48} />
-            </div>
+            <div className="success-icon-box bg-emerald-100 text-emerald-600"><ShieldCheck size={48} /></div>
             <h2 className="text-2xl font-bold mt-4">Device Check</h2>
             <p className="text-green-500 font-semibold mt-1 mb-6">✓ Device Authenticated</p>
-            <button className="btn btn-primary full" onClick={() => setStep(4)}>
-              Continue to Biometric
-            </button>
+            <button className="btn btn-primary full" onClick={() => setStep(4)}>Continue to Biometric</button>
           </div>
         )}
 
-        {/* 🔥 STEP 4 — Native OS Biometric Verification */}
+        {/* Step 4: Biometric */}
         {step === 4 && (
           <div className="mark-card text-center animate-fade-in">
             <h2 className="text-2xl font-bold mt-2">Biometric Auth</h2>
 
             <p className="text-muted mt-2 mb-6">
-              {isAuthenticating
-                ? "Follow the prompt on your phone…"
-                : "Tap below, then place your finger on your phone's fingerprint sensor"}
+              {isAuthenticating ? "Verifying with device sensor..." : "Tap the fingerprint icon below to verify."}
             </p>
 
             <button
@@ -349,36 +362,43 @@ export default function StudentMark() {
               className={`fingerprint-sensor-btn ${isAuthenticating ? "scanning" : ""}`}
               style={{ background: "none", border: "none", cursor: "pointer" }}
             >
-              <Fingerprint
-                size={80}
-                className={isAuthenticating ? "text-emerald-500" : "text-indigo-500"}
-              />
+              <Fingerprint size={80} className={isAuthenticating ? "text-emerald-500" : "text-indigo-500"} />
               {isAuthenticating && <div className="fp-laser"></div>}
             </button>
 
             <p className="text-xs text-gray-400 mt-6 font-bold">
-              {isAuthenticating
-                ? "Waiting for fingerprint / face verification…"
-                : "Tap the fingerprint icon → then use your phone's sensor"}
+              {isAuthenticating ? "Waiting for verification..." : "Touch & Hold to Scan"}
             </p>
           </div>
         )}
 
+        {/* Step 5: Success */}
         {step === 5 && (
           <div className="mark-card text-center animate-fade-in">
-            <div className="success-icon-box bg-emerald-100 text-emerald-500 pop-animation">
-              <CheckCircle size={64} />
-            </div>
+            <div className="success-icon-box bg-emerald-100 text-emerald-500 pop-animation"><CheckCircle size={64} /></div>
             <h2 className="text-2xl font-bold text-emerald-600 mt-4">Attendance Marked!</h2>
-            <p className="text-muted mt-2 mb-6">
-              Your presence has been successfully recorded.
-            </p>
-            <button className="btn btn-primary full" onClick={() => navigate("/student")}>
-              Back to Dashboard
-            </button>
+            <p className="text-muted mt-2 mb-6">Your presence has been successfully recorded.</p>
+            <button className="btn btn-primary full" onClick={() => navigate("/student")}>Back to Dashboard</button>
           </div>
         )}
       </div>
+
+      {/* 🔥 Fallback Confirmation Modal */}
+      {showFallbackModal && (
+        <div className="custom-modal-backdrop">
+          <div className="custom-modal">
+            <div className="modal-icon-box"><Fingerprint size={48} className="text-indigo-600" /></div>
+            <h3 className="text-xl font-bold text-gray-800 mt-2">Manual Confirmation</h3>
+            <p className="text-gray-500 text-sm mt-2 text-center">
+              Biometric verification is not available or was cancelled. Please confirm to mark your attendance.
+            </p>
+            <div className="flex gap-3 w-full mt-6">
+              <button className="btn btn-ghost flex-1" onClick={() => setShowFallbackModal(false)}>Cancel</button>
+              <button className="btn btn-primary flex-1" onClick={confirmFallback}>Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
