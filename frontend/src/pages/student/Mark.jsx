@@ -8,7 +8,9 @@ const getStoredDevice = () => {
   let dev = localStorage.getItem("attendx_device");
   if (!dev) {
     const deviceId = window.crypto.randomUUID();
-    const deviceKey = Array.from(window.crypto.getRandomValues(new Uint8Array(32))).map(b => b.toString(16).padStart(2, "0")).join("");
+    const deviceKey = Array.from(window.crypto.getRandomValues(new Uint8Array(32)))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
     dev = JSON.stringify({ deviceId, deviceKey });
     localStorage.setItem("attendx_device", dev);
   }
@@ -17,16 +19,115 @@ const getStoredDevice = () => {
 
 const generateProof = async (secret, prefix, challenge) => {
   const enc = new TextEncoder();
-  const key = await window.crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const key = await window.crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
   const sig = await window.crypto.subtle.sign("HMAC", key, enc.encode(prefix + challenge));
-  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+};
+
+// ==========================================
+// 🔐 WebAuthn Helpers (Real OS Biometrics)
+// ==========================================
+
+const registerBiometric = async (deviceId) => {
+  if (!window.PublicKeyCredential) {
+    throw new Error("Biometric authentication is not supported on this device/browser.");
+  }
+
+  const challenge = window.crypto.getRandomValues(new Uint8Array(32));
+  const userId = window.crypto.getRandomValues(new Uint8Array(16));
+
+  try {
+    const credential = await navigator.credentials.create({
+      publicKey: {
+        challenge,
+        rp: { name: "AttendX", id: window.location.hostname },
+        user: {
+          id: userId,
+          name: deviceId,
+          displayName: "Student",
+        },
+        pubKeyCredParams: [
+          { alg: -7, type: "public-key" },  // ES256
+          { alg: -257, type: "public-key" }, // RS256
+        ],
+        authenticatorSelection: {
+          authenticatorAttachment: "platform", 
+          userVerification: "required",        
+        },
+        timeout: 60000,
+        attestation: "none",
+      },
+    });
+
+    if (!credential) throw new Error("Biometric enrollment was cancelled.");
+
+    const credId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
+    localStorage.setItem("attendx_biometric_cred", credId);
+    return credId;
+  } catch (err) {
+    if (err.name === "NotAllowedError") {
+      throw new Error("Fingerprint/FaceID setup was cancelled. Please try again.");
+    }
+    throw err;
+  }
+};
+
+const performBiometricVerification = async (deviceId) => {
+  if (!window.PublicKeyCredential) {
+    throw new Error("Biometric authentication is not supported on this device/browser.");
+  }
+
+  let credIdB64 = localStorage.getItem("attendx_biometric_cred");
+  
+  // Agar pehli baar hai, toh register karo
+  if (!credIdB64) {
+    credIdB64 = await registerBiometric(deviceId);
+  }
+
+  const credId = Uint8Array.from(atob(credIdB64), (c) => c.charCodeAt(0));
+
+  try {
+    // Ye line OS ka biometric popup trigger karegi
+    return await navigator.credentials.get({
+      publicKey: {
+        challenge: window.crypto.getRandomValues(new Uint8Array(32)),
+        timeout: 60000,
+        userVerification: "required",
+        allowCredentials: [{ id: credId, type: "public-key", transports: ["internal"] }],
+      },
+    });
+  } catch (err) {
+    if (err.name === "NotAllowedError") {
+      throw new Error("Biometric verification was cancelled or timed out.");
+    }
+    
+    // Agar credential stale ho gaya hai (jaise phone ka lock change hua), toh re-register karo
+    localStorage.removeItem("attendx_biometric_cred");
+    credIdB64 = await registerBiometric(deviceId);
+    const newCredId = Uint8Array.from(atob(credIdB64), (c) => c.charCodeAt(0));
+    
+    return await navigator.credentials.get({
+      publicKey: {
+        challenge: window.crypto.getRandomValues(new Uint8Array(32)),
+        timeout: 60000,
+        userVerification: "required",
+        allowCredentials: [{ id: newCredId, type: "public-key", transports: ["internal"] }],
+      },
+    });
+  }
 };
 
 const STEPS = [
   { id: 1, label: "Scan", icon: QrCode },
   { id: 2, label: "BLE", icon: Bluetooth },
   { id: 3, label: "Device", icon: ShieldCheck },
-  { id: 4, label: "Biometric", icon: Fingerprint }
+  { id: 4, label: "Biometric", icon: Fingerprint },
 ];
 
 export default function StudentMark() {
@@ -35,12 +136,8 @@ export default function StudentMark() {
   const [isCameraLoading, setIsCameraLoading] = useState(false);
   const [scannedData, setScannedData] = useState(null);
   const [error, setError] = useState("");
-  
-  // 🔥 Fingerprint Press State
-  const [isPressing, setIsPressing] = useState(false);
-  const [pressProgress, setPressProgress] = useState(0);
-  const [isAuthenticating, setIsAuthenticating] = useState(false); 
-  
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -70,13 +167,13 @@ export default function StudentMark() {
               scanner = null;
             }
             if (!isMounted) return;
-            
+
             try {
               const parsed = JSON.parse(decodedText);
               if (parsed.sessionId && parsed.window !== undefined && parsed.qrToken) {
                 setScannedData(parsed);
                 setIsScanning(false);
-                setStep(2); 
+                setStep(2);
               } else {
                 setError("Invalid QR format");
                 setIsScanning(false);
@@ -86,7 +183,7 @@ export default function StudentMark() {
               setIsScanning(false);
             }
           },
-          () => {} 
+          () => {}
         );
       } catch (err) {
         setError("Camera access denied or not found.");
@@ -95,7 +192,7 @@ export default function StudentMark() {
         setIsCameraLoading(false);
       }
     };
-    
+
     setTimeout(startScanner, 100);
 
     return () => {
@@ -104,49 +201,20 @@ export default function StudentMark() {
     };
   }, [isScanning]);
 
-  // 🔥 FINGERPRINT HOLD LOGIC
-  const startPress = () => {
+  // 🔥 Trigger Real OS Sensor
+  const startBiometric = async () => {
     if (isAuthenticating) return;
-    setIsPressing(true);
-    setPressProgress(0);
+    setIsAuthenticating(true);
     setError("");
 
-    let currentProgress = 0;
-    const interval = setInterval(() => {
-      currentProgress += 10;
-      setPressProgress(currentProgress);
-      
-      if (currentProgress >= 100) {
-        clearInterval(interval);
-        executeBiometricAuth();
-      }
-    }, 100); // 1 second hold required
-
-    // Save interval ID to clear it if user releases early
-    window.pressInterval = interval;
-  };
-
-  const endPress = () => {
-    if (isAuthenticating) return;
-    setIsPressing(false);
-    setPressProgress(0);
-    if (window.pressInterval) {
-      clearInterval(window.pressInterval);
-    }
-  };
-
-  const executeBiometricAuth = async () => {
-    setIsAuthenticating(true);
-    setIsPressing(false);
-
     try {
-      // Fake delay for visual effect
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Generate Proofs & Submit
       const dev = getStoredDevice();
+
+      // 1. Trigger OS Fingerprint/FaceID prompt
+      await performBiometricVerification(dev.deviceId);
+
+      // 2. Generate Proofs & Submit
       const challengeString = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
-      
       const deviceProof = await generateProof(dev.deviceKey, "device:", challengeString);
       const fingerprintProof = await generateProof(dev.deviceKey, "fingerprint:", challengeString);
 
@@ -157,17 +225,18 @@ export default function StudentMark() {
         deviceId: dev.deviceId,
         deviceProof,
         fingerprintProof,
-        bleRssi: -55 
+        bleRssi: -55,
       });
 
-      setStep(5); 
-
+      setStep(5);
     } catch (err) {
-      setError(err.response?.data?.message || err.message || "Failed to mark attendance. Please try again.");
-      // Agar backend error de, toh step 4 par hi rahein
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Failed to mark attendance. Please try again."
+      );
     } finally {
       setIsAuthenticating(false);
-      setPressProgress(0);
     }
   };
 
@@ -179,12 +248,12 @@ export default function StudentMark() {
           const isCompleted = step > s.id;
           return (
             <div key={s.id} className="modern-step">
-              <div className={`step-circle ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}>
+              <div className={`step-circle ${isActive ? "active" : ""} ${isCompleted ? "completed" : ""}`}>
                 {isCompleted ? <CheckCircle size={18} /> : <s.icon size={18} />}
               </div>
-              <span className={`step-text ${isActive ? 'active' : ''}`}>{s.label}</span>
+              <span className={`step-text ${isActive ? "active" : ""}`}>{s.label}</span>
               {i !== STEPS.length - 1 && (
-                <div className={`step-line ${isCompleted ? 'completed' : ''}`} />
+                <div className={`step-line ${isCompleted ? "completed" : ""}`} />
               )}
             </div>
           );
@@ -205,11 +274,13 @@ export default function StudentMark() {
               <h2>Scan Attendance QR</h2>
               <p>Point your camera at the teacher's screen</p>
             </div>
-            
-            <div className={`camera-wrapper ${isScanning ? 'active' : ''}`}>
+
+            <div className={`camera-wrapper ${isScanning ? "active" : ""}`}>
               {!isScanning ? (
                 <div className="camera-placeholder" onClick={() => setIsScanning(true)}>
-                  <div className="scan-icon-box"><QrCode size={48} /></div>
+                  <div className="scan-icon-box">
+                    <QrCode size={48} />
+                  </div>
                   <button className="btn btn-primary mt-4">Open Camera</button>
                 </div>
               ) : (
@@ -225,7 +296,7 @@ export default function StudentMark() {
                 </>
               )}
             </div>
-            
+
             {isScanning && (
               <button className="btn btn-ghost full mt-4" onClick={() => setIsScanning(false)}>
                 Cancel
@@ -260,41 +331,35 @@ export default function StudentMark() {
           </div>
         )}
 
-        {/* 🔥 STEP 4: SIMPLE PRESS & HOLD FINGERPRINT */}
+        {/* 🔥 STEP 4 — Native OS Biometric Verification */}
         {step === 4 && (
           <div className="mark-card text-center animate-fade-in">
             <h2 className="text-2xl font-bold mt-2">Biometric Auth</h2>
-            
+
             <p className="text-muted mt-2 mb-6">
-              {isAuthenticating ? "Verifying Fingerprint..." : "Press and hold the sensor below"}
+              {isAuthenticating
+                ? "Follow the prompt on your phone…"
+                : "Tap below, then place your finger on your phone's fingerprint sensor"}
             </p>
 
-            <div 
-              className={`fingerprint-sensor-btn ${isAuthenticating ? 'scanning' : ''} ${isPressing ? 'pressing' : ''}`}
-              onMouseDown={startPress}
-              onMouseUp={endPress}
-              onMouseLeave={endPress}
-              onTouchStart={startPress}
-              onTouchEnd={endPress}
+            <button
+              type="button"
+              onClick={startBiometric}
+              disabled={isAuthenticating}
+              className={`fingerprint-sensor-btn ${isAuthenticating ? "scanning" : ""}`}
+              style={{ background: "none", border: "none", cursor: "pointer" }}
             >
-              <Fingerprint 
-                size={80} 
-                className={isAuthenticating || isPressing ? "text-emerald-500" : "text-indigo-500"} 
+              <Fingerprint
+                size={80}
+                className={isAuthenticating ? "text-emerald-500" : "text-indigo-500"}
               />
-              
-              {/* Progress circle overlay during press */}
-              {isPressing && (
-                <div 
-                  className="press-progress-ring" 
-                  style={{ background: `conic-gradient(#10b981 ${pressProgress}%, transparent 0)` }}
-                ></div>
-              )}
-
               {isAuthenticating && <div className="fp-laser"></div>}
-            </div>
+            </button>
 
             <p className="text-xs text-gray-400 mt-6 font-bold">
-              {isAuthenticating ? "Please wait..." : isPressing ? "Keep holding..." : "Touch & Hold to Scan"}
+              {isAuthenticating
+                ? "Waiting for fingerprint / face verification…"
+                : "Tap the fingerprint icon → then use your phone's sensor"}
             </p>
           </div>
         )}
@@ -305,7 +370,9 @@ export default function StudentMark() {
               <CheckCircle size={64} />
             </div>
             <h2 className="text-2xl font-bold text-emerald-600 mt-4">Attendance Marked!</h2>
-            <p className="text-muted mt-2 mb-6">Your presence has been successfully recorded.</p>
+            <p className="text-muted mt-2 mb-6">
+              Your presence has been successfully recorded.
+            </p>
             <button className="btn btn-primary full" onClick={() => navigate("/student")}>
               Back to Dashboard
             </button>
