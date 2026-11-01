@@ -1,8 +1,8 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { 
   LayoutDashboard, Users, BookOpen, FileText, Settings, LogOut, 
-  Home, ScanLine, ClipboardList, User, AlertTriangle 
+  Home, ScanLine, ClipboardList, User 
 } from "lucide-react";
 
 export default function Layout() {
@@ -23,9 +23,8 @@ export default function Layout() {
       { to: "/faculty", icon: LayoutDashboard, label: "Dashboard" },
       { to: "/faculty/courses", icon: BookOpen, label: "Courses" },
       { to: "/faculty/sessions", icon: ClipboardList, label: "Sessions" },
-      { to: "/faculty/reports", icon: FileText, label: "Reports" },
-      // 🔥 Yahan Profile add kiya hai
-      { to: "/faculty/profile", icon: User, label: "Profile" } 
+      { to: "/faculty/reports", icon: FileText, label: "Reports" }
+      // 🔥 Faculty side bar se Profile hata diya hai
     ],
     student: [
       { to: "/student", icon: Home, label: "Home" },
@@ -36,6 +35,9 @@ export default function Layout() {
   };
 
   const items = navItems[user.role] || [];
+
+  // Profile route logic based on role
+  const profilePath = user.role === "admin" ? "/admin/settings" : `/${user.role}/profile`;
 
   return (
     <div className="app-shell">
@@ -66,8 +68,16 @@ export default function Layout() {
             {user.role === "faculty" && `Welcome back, ${user.firstName}`}
             {user.role === "student" && `Hello ${user.firstName} 👋`}
           </div>
+          
           <div className="topbar-right">
-             <div className="avatar">{user.firstName[0]}{user.lastName[0]}</div>
+             {/* 🔥 Avatar clickable ho gaya hai */}
+             <div 
+               className="avatar cursor-pointer hover:scale-105 transition-transform" 
+               onClick={() => navigate(profilePath)}
+               title="View Profile"
+             >
+               {user.firstName[0]}{user.lastName[0]}
+             </div>
           </div>
         </header>
 
@@ -83,6 +93,12 @@ export default function Layout() {
               <span>{item.label}</span>
             </NavLink>
           ))}
+          
+          {/* Mobile Bottom tab mein Profile add karein taaki mobile pe bhi access ho sake */}
+          <NavLink to={profilePath} className={({ isActive }) => `bottom-tab ${isActive ? "active" : ""}`}>
+            <User size={22} />
+            <span>Profile</span>
+          </NavLink>
         </div>
       </div>
     </div>

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import client from "../../api/client";
-import { Users, BookOpen, Activity, PlayCircle, ChevronRight, ChevronLeft } from "lucide-react";
+import { Users, BookOpen, Activity, PlayCircle, ChevronRight } from "lucide-react";
 
 export default function FacultyDashboard() {
   const navigate = useNavigate();
+  
   const [activeSession, setActiveSession] = useState(null);
   const [todayClasses, setTodayClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -27,13 +28,13 @@ export default function FacultyDashboard() {
 
   return (
     <div className="stack pb-20">
-      {/* Welcome Banner */}
-      <div className="welcome-banner">
+      {/* Welcome Banner (Logout button removed) */}
+      <div className="welcome-banner flex justify-between items-center">
         <div>
           <h2 className="m-0 text-white">Welcome back, Professor!</h2>
           <p className="text-indigo-100 mt-1">Here is what's happening today.</p>
         </div>
-        <Activity size={48} className="text-white opacity-50" />
+        <Activity size={48} className="text-white opacity-20 hidden sm:block" />
       </div>
 
       {/* Stats */}

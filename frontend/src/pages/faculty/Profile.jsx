@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext"; // 🔥 Logout ke liye import kiya
 import client from "../../api/client";
 import { useToast } from "../../context/ToastContext";
-import { ChevronLeft, Lock, User, Mail, Building, ShieldCheck } from "lucide-react";
+import { ChevronLeft, Lock, User, Mail, Building, ShieldCheck, LogOut } from "lucide-react";
 
 export default function FacultyProfile() {
   const { success, error } = useToast();
+  const { logout } = useAuth(); // 🔥 AuthContext se logout nikala
   const navigate = useNavigate();
   
   const [profile, setProfile] = useState(null);
@@ -44,6 +46,14 @@ export default function FacultyProfile() {
       error(err.response?.data?.message || "Failed to change password");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // 🔥 Manual Logout Function
+  const handleLogout = async () => {
+    if (window.confirm("Are you sure you want to logout?")) {
+      await logout();
+      navigate("/login");
     }
   };
 
@@ -161,6 +171,22 @@ export default function FacultyProfile() {
           </form>
         )}
       </div>
+
+      {/* 🔥 Account Actions (Logout) */}
+      <div className="card mt-4 border-red-100 bg-red-50">
+        <div className="row-between">
+          <div>
+            <h3 className="m-0 font-bold text-red-700 flex items-center gap-2">
+              <LogOut size={18} /> Account Actions
+            </h3>
+            <p className="small text-red-500 mt-1">Safely log out from this device.</p>
+          </div>
+          <button onClick={handleLogout} className="btn btn-danger shadow-sm">
+            Logout
+          </button>
+        </div>
+      </div>
+      
     </div>
   );
 }
