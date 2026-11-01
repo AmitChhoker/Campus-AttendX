@@ -29,10 +29,18 @@ const STEPS = [
   { id: 4, label: "Biometric", icon: Fingerprint }
 ];
 
+// 🔥 SMART BIOMETRIC FUNCTION
 const authenticateBiometric = async () => {
   try {
+    // Check if browser supports WebAuthn
+    if (!window.PublicKeyCredential) {
+      throw new Error("WebAuthn not supported");
+    }
+
     const challenge = new Uint8Array(32);
     window.crypto.getRandomValues(challenge);
+    
+    // Attempt to trigger OS Biometric
     await navigator.credentials.get({
       publicKey: {
         challenge: challenge,
@@ -42,14 +50,20 @@ const authenticateBiometric = async () => {
     });
     return true;
   } catch (err) {
-    return false;
+    console.warn("Biometric hardware error:", err.message);
+    
+    // 🔥 FALLBACK: If biometric fails (no fingerprint registered, cancelled, or not supported)
+    const userConfirmed = window.confirm(
+      "Biometric scan failed or unavailable.\n\nClick OK to manually confirm your attendance."
+    );
+    return userConfirmed; // Returns true if user clicked OK
   }
 };
 
 export default function StudentMark() {
   const [step, setStep] = useState(1);
   const [isScanning, setIsScanning] = useState(false);
-  const [isCameraLoading, setIsCameraLoading] = useState(false); // 🔥 Camera loading state
+  const [isCameraLoading, setIsCameraLoading] = useState(false);
   const [scannedData, setScannedData] = useState(null);
   const [error, setError] = useState("");
   const [isAuthenticating, setIsAuthenticating] = useState(false); 
@@ -74,7 +88,7 @@ export default function StudentMark() {
         scanner = new Html5Qrcode("reader");
         await scanner.start(
           { facingMode: "environment" },
-          { fps: 15, qrbox: { width: 250, height: 250 } }, // Smooth FPS
+          { fps: 15, qrbox: { width: 250, height: 250 } },
           async (decodedText) => {
             if (scanner) {
               await scanner.stop();
@@ -108,7 +122,6 @@ export default function StudentMark() {
       }
     };
     
-    // Slight delay to ensure DOM is ready
     setTimeout(startScanner, 100);
 
     return () => {
@@ -123,8 +136,12 @@ export default function StudentMark() {
       if (!scannedData) throw new Error("No QR data found. Please scan again.");
       setIsAuthenticating(true); 
       
+      // 🔥 Call the smart biometric function
       const isAuthenticated = await authenticateBiometric();
-      if (!isAuthenticated) throw new Error("Biometric auth failed or cancelled.");
+      
+      if (!isAuthenticated) {
+        throw new Error("Authentication cancelled by user.");
+      }
       
       const dev = getStoredDevice();
       const challenge = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
