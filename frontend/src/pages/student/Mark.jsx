@@ -1,26 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Html5Qrcode } from "html5-qrcode";
 import client from "../../api/client";
-import { QrCode, Bluetooth, ShieldCheck, Fingerprint, CheckCircle, AlertCircle } from "lucide-react";
-
-const getStoredDevice = () => {
-  let dev = localStorage.getItem("attendx_device");
-  if (!dev) {
-    const deviceId = window.crypto.randomUUID();
-    const deviceKey = Array.from(window.crypto.getRandomValues(new Uint8Array(32))).map(b => b.toString(16).padStart(2, "0")).join("");
-    dev = JSON.stringify({ deviceId, deviceKey });
-    localStorage.setItem("attendx_device", dev);
-  }
-  return JSON.parse(dev);
-};
-
-const generateProof = async (secret, prefix, challenge) => {
-  const enc = new TextEncoder();
-  const key = await window.crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const sig = await window.crypto.subtle.sign("HMAC", key, enc.encode(prefix + challenge));
-  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
-};
+import { QrCode, Bluetooth, ShieldCheck, Fingerprint, CheckCircle, AlertCircle, Upload } from "lucide-react";
+// Device utils import karein
+import { getStoredDevice, generateProof, DEVICE_PROOF_PREFIX, FINGERPRINT_PROOF_PREFIX } from "../../utils/deviceBinding";
 
 const STEPS = [
   { id: 1, label: "Scan QR", icon: QrCode },
@@ -29,28 +13,20 @@ const STEPS = [
   { id: 4, label: "Biometric", icon: Fingerprint }
 ];
 
-// 🔥 FIXED BIOMETRIC FUNCTION
+// 🔥 BIOMETRIC FALLBACK (Laptop me sensor na ho toh bhi pass ho jayega)
 const authenticateBiometric = async () => {
   try {
     if (!window.PublicKeyCredential) throw new Error("WebAuthn not supported");
     const challenge = new Uint8Array(32);
     window.crypto.getRandomValues(challenge);
     await navigator.credentials.get({
-      publicKey: {
-        challenge: challenge,
-        timeout: 60000,
-        userVerification: "required",
-      }
+      publicKey: { challenge: challenge, timeout: 60000, userVerification: "required" }
     });
     return true;
   } catch (err) {
     console.warn("Biometric WebAuthn failed or cancelled:", err);
-    
-    // Fallback: Since the server only verifies the HMAC proof, 
-    // we use a manual confirmation if WebAuthn fails.
-    return window.confirm(
-      "Biometric prompt cancelled or unavailable.\nClick OK to confirm attendance manually."
-    );
+    // Fallback: Agar hardware nahi hai toh manual confirm
+    return window.confirm("Biometric prompt unavailable. Click OK to confirm attendance manually.");
   }
 };
 
@@ -61,14 +37,9 @@ export default function StudentMark() {
   const [error, setError] = useState("");
   const [isAuthenticating, setIsAuthenticating] = useState(false); 
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    try {
-      const dev = getStoredDevice();
-      client.post("/student/device/bind", { deviceId: dev.deviceId, deviceKey: dev.deviceKey }).catch(() => {});
-    } catch (err) {}
-  }, []);
-
+  // Camera Scanner Logic
   useEffect(() => {
     if (!isScanning) return;
     let scanner = null;
@@ -79,7 +50,7 @@ export default function StudentMark() {
         scanner = new Html5Qrcode("reader");
         await scanner.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 220, height: 220 } },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
           async (decodedText) => {
             if (scanner) {
               await scanner.stop();
@@ -87,21 +58,7 @@ export default function StudentMark() {
               scanner = null;
             }
             if (!isMounted) return;
-            try {
-              const parsed = JSON.parse(decodedText);
-              if (parsed.sessionId && parsed.window !== undefined && parsed.qrToken) {
-                setScannedData(parsed);
-                setIsScanning(false);
-                setError("");
-                setStep(2); 
-              } else {
-                setError("Invalid QR format");
-                setIsScanning(false);
-              }
-            } catch (e) {
-              setError("Invalid QR Code. Please scan the teacher's QR.");
-              setIsScanning(false);
-            }
+            processScannedText(decodedText);
           },
           () => {} 
         );
@@ -117,6 +74,40 @@ export default function StudentMark() {
     };
   }, [isScanning]);
 
+  // Common function to process text (from Camera OR File)
+  const processScannedText = (decodedText) => {
+    try {
+      const parsed = JSON.parse(decodedText);
+      if (parsed.sessionId && parsed.window !== undefined && parsed.qrToken) {
+        setScannedData(parsed);
+        setIsScanning(false);
+        setError("");
+        setStep(2); 
+      } else {
+        setError("Invalid QR format");
+        setIsScanning(false);
+      }
+    } catch (e) {
+      setError("Invalid QR Code. Please scan the teacher's QR.");
+      setIsScanning(false);
+    }
+  };
+
+  // Handle File Upload (Screenshot)
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      setError("");
+      const html5QrCode = new Html5Qrcode("reader-file-hidden");
+      const decodedText = await html5QrCode.scanFile(file, true);
+      processScannedText(decodedText);
+    } catch (err) {
+      setError("Failed to read QR from image. Make sure it's clear.");
+    }
+  };
+
   const handleFinalSubmit = async () => {
     try {
       setError("");
@@ -126,11 +117,13 @@ export default function StudentMark() {
       const isAuthenticated = await authenticateBiometric();
       if (!isAuthenticated) throw new Error("Biometric authentication cancelled by user.");
       
-      const dev = getStoredDevice();
+      const dev = getStoredDevice(); // Ye login ke time bind ho chuka hoga
+      if (!dev) throw new Error("Device not found. Please login again.");
+      
       const challenge = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
       
-      const deviceProof = await generateProof(dev.deviceKey, "device:", challenge);
-      const fingerprintProof = await generateProof(dev.deviceKey, "fingerprint:", challenge);
+      const deviceProof = await generateProof(dev.deviceKey, DEVICE_PROOF_PREFIX, challenge);
+      const fingerprintProof = await generateProof(dev.deviceKey, FINGERPRINT_PROOF_PREFIX, challenge);
 
       await client.post("/student/scan-attendance/scan", {
         sessionId: scannedData.sessionId,
@@ -144,14 +137,11 @@ export default function StudentMark() {
 
       setStep(5); 
     } catch (err) {
-      // 🔥 FIX: Agar token expire ho gaya hai toh logout karke login bhej dein
-      if (err.response?.status === 401 || err.response?.data?.message?.includes("Invalid student ID")) {
-        alert("Your session has expired. Please login again.");
-        localStorage.removeItem("attendx_device");
+      if (err.response?.status === 401) {
+        alert("Session expired. Please login again.");
         navigate("/login");
         return;
       }
-
       setError(err.response?.data?.message || err.message || "Failed to mark attendance");
       setStep(1);
       setIsScanning(false);
@@ -163,6 +153,8 @@ export default function StudentMark() {
 
   return (
     <div className="scan-dashboard pb-20">
+      <div id="reader-file-hidden" style={{ display: "none" }}></div>
+
       <div className="modern-stepper">
         {STEPS.map((s, i) => {
           const isActive = step === s.id;
@@ -191,17 +183,40 @@ export default function StudentMark() {
           <div className="glass-panel text-center animate-fade-in">
             <h2 className="text-2xl font-bold mb-2">Scan Attendance QR</h2>
             <p className="text-muted mb-6">Position the QR code inside the frame</p>
+            
             <div className={`scanner-container ${isScanning ? 'scanning' : ''}`}>
               {!isScanning ? (
-                <div className="scanner-placeholder" onClick={() => { setError(""); setIsScanning(true); }}>
+                <div className="scanner-placeholder flex flex-col items-center justify-center p-6">
                   <QrCode size={64} className="text-indigo-500 mb-4" />
-                  <button className="btn btn-primary">Open Camera</button>
+                  
+                  <button className="btn btn-primary w-full mb-3" onClick={() => { setError(""); setIsScanning(true); }}>
+                    Open Camera
+                  </button>
+                  
+                  <div className="w-full text-center">
+                    <p className="text-sm text-gray-400 mb-2">OR</p>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      ref={fileInputRef} 
+                      onChange={handleFileUpload} 
+                      style={{ display: "none" }} 
+                    />
+                    <button 
+                      className="btn btn-secondary w-full flex items-center justify-center gap-2" 
+                      onClick={() => fileInputRef.current.click()}
+                      style={{ backgroundColor: '#e2e8f0', color: '#1e293b' }}
+                    >
+                      <Upload size={18} /> Upload QR Screenshot
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div id="reader" className="camera-view"></div>
               )}
               <div className="scan-laser"></div>
             </div>
+            
             {isScanning && (
               <button className="btn btn-ghost mt-4 w-full" onClick={() => setIsScanning(false)}>Cancel</button>
             )}
@@ -234,7 +249,7 @@ export default function StudentMark() {
             </div>
             <h2 className="text-2xl font-bold mb-2">Biometric Auth</h2>
             {isAuthenticating ? (
-              <p className="text-indigo-500 font-bold animate-pulse mb-6">Waiting for OS Biometric...</p>
+              <p className="text-indigo-500 font-bold animate-pulse mb-6">Waiting for confirmation...</p>
             ) : (
               <p className="text-muted mb-6">Tap below to authenticate.</p>
             )}

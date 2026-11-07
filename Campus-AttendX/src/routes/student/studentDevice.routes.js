@@ -4,15 +4,14 @@ const router = express.Router();
 const authMiddleware = require("../../middleware/authMiddleware");
 const roleMiddleware = require("../../middleware/role.middleware");
 
-const {
-    bindDevice
-} = require("../../controllers/student/studentDevice.controller");
+const { bindDevice } = require("../../controllers/student/studentDevice.controller");
 
+// POST /api/student/device/bind
 router.post(
-    "/bind",
-    authMiddleware,
-    roleMiddleware("student"),
-    bindDevice
+  "/bind",
+  authMiddleware,
+  roleMiddleware("student"),
+  bindDevice
 );
 
 module.exports = router;

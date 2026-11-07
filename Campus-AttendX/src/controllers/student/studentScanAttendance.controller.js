@@ -1,10 +1,33 @@
 const mongoose = require("mongoose");
+const crypto = require("crypto"); // 🔥 Crypto import kiya
 const User = require("../../models/User");
 const AttendanceSession = require("../../models/AttendanceSession");
 const Attendance = require("../../models/Attendance");
 const { validateDynamicQrPayload } = require("../../utils/dynamicQr");
 const { validateBlePayload, BLE_MIN_RSSI, BLE_MAX_RSSI } = require("../../utils/dynamicBle");
-const { verifyProof, DEVICE_PROOF_PREFIX, FINGERPRINT_PROOF_PREFIX } = require("../../utils/deviceBinding");
+
+// 🔥 INLINE VERIFY PROOF (Koi external import nahi)
+const DEVICE_PROOF_PREFIX = "device:";
+const FINGERPRINT_PROOF_PREFIX = "fingerprint:";
+
+const verifyProof = ({ secret, prefix, challenge, proof }) => {
+  if (!secret || !proof) return false;
+  try {
+    const expectedProof = crypto
+      .createHmac("sha256", secret)
+      .update(prefix + challenge)
+      .digest("hex");
+      
+    const proofBuffer = Buffer.from(proof, "hex");
+    const expectedBuffer = Buffer.from(expectedProof, "hex");
+
+    if (proofBuffer.length !== expectedBuffer.length) return false;
+    return crypto.timingSafeEqual(proofBuffer, expectedBuffer);
+  } catch (err) {
+    console.error("Verify Proof Error:", err);
+    return false;
+  }
+};
 
 const REQUIRE_BLE = process.env.REQUIRE_BLE === "true";
 const REQUIRE_FINGERPRINT = process.env.REQUIRE_FINGERPRINT === "true";
@@ -45,14 +68,17 @@ const scanAttendance = async ({
   let bleVerified = false;
   if (bleToken && bleWindow !== undefined) {
     if (typeof bleRssi !== "number" || bleRssi < BLE_MIN_RSSI || bleRssi > BLE_MAX_RSSI) throw createError(`BLE signal out of range (${bleRssi} dBm).`, 400);
-    const validBle = validateBlePayload({ bleSecret: session.bleSecret, window: bleWindow, bleToken });
+    const validBle = validateBlePayload({ bleSecret: session.bleSecret, window: bleWindow, token: bleToken });
     if (!validBle) throw createError("BLE proximity verification failed.", 400);
     bleVerified = true;
   } else if (REQUIRE_BLE) {
     throw createError("BLE proximity proof is required.", 400);
   }
 
-  if (!student.deviceBinding || !student.deviceBinding.deviceId) throw createError("No device is bound to your account.", 400);
+  // Device Binding Check
+  if (!student.deviceBinding || !student.deviceBinding.deviceId) {
+    throw createError("No device is bound to your account. Please refresh or contact admin.", 400);
+  }
   if (student.deviceBinding.deviceId !== deviceId) throw createError("This is not your bound device.", 403);
   if (!student.deviceBinding.deviceKey) throw createError("Device key is missing.", 400);
 
@@ -61,7 +87,7 @@ const scanAttendance = async ({
   const deviceVerified = verifyProof({ secret: student.deviceBinding.deviceKey, prefix: DEVICE_PROOF_PREFIX, challenge, proof: deviceProof });
   if (!deviceVerified) throw createError("Device verification failed.", 403);
 
-  // 🔥 STRICT FINGERPRINT CHECK
+  // STRICT FINGERPRINT CHECK
   let fingerprintVerified = false;
   
   if (REQUIRE_FINGERPRINT) {
