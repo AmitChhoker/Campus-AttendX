@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { Html5Qrcode } from "html5-qrcode";
 import client from "../../api/client";
 import { QrCode, Bluetooth, ShieldCheck, Fingerprint, CheckCircle, AlertCircle, Upload } from "lucide-react";
-// Device utils import karein
 import { getStoredDevice, generateProof, DEVICE_PROOF_PREFIX, FINGERPRINT_PROOF_PREFIX } from "../../utils/deviceBinding";
 
 const STEPS = [
@@ -13,20 +12,22 @@ const STEPS = [
   { id: 4, label: "Biometric", icon: Fingerprint }
 ];
 
-// 🔥 BIOMETRIC FALLBACK (Laptop me sensor na ho toh bhi pass ho jayega)
+// 🔥 REAL BIOMETRIC (With fallback for no sensor)
 const authenticateBiometric = async () => {
   try {
     if (!window.PublicKeyCredential) throw new Error("WebAuthn not supported");
     const challenge = new Uint8Array(32);
     window.crypto.getRandomValues(challenge);
+    
+    // Ye OS ka Fingerprint/FaceID popup open karega
     await navigator.credentials.get({
       publicKey: { challenge: challenge, timeout: 60000, userVerification: "required" }
     });
     return true;
   } catch (err) {
-    console.warn("Biometric WebAuthn failed or cancelled:", err);
-    // Fallback: Agar hardware nahi hai toh manual confirm
-    return window.confirm("Biometric prompt unavailable. Click OK to confirm attendance manually.");
+    console.warn("Biometric WebAuthn failed/cancelled:", err);
+    // Agar laptop me sensor nahi hai, toh ye confirm box aayega
+    return window.confirm("Biometric sensor not found or cancelled. Click OK to bypass for local testing.");
   }
 };
 
@@ -36,10 +37,19 @@ export default function StudentMark() {
   const [scannedData, setScannedData] = useState(null);
   const [error, setError] = useState("");
   const [isAuthenticating, setIsAuthenticating] = useState(false); 
+  const [deviceId, setDeviceId] = useState(null); // 🔥 UI me dikhane ke liye
+  
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
-  // Camera Scanner Logic
+  // 🔥 Check if device is bound on mount
+  useEffect(() => {
+    const dev = getStoredDevice();
+    if (dev) {
+      setDeviceId(dev.deviceId);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isScanning) return;
     let scanner = null;
@@ -74,7 +84,6 @@ export default function StudentMark() {
     };
   }, [isScanning]);
 
-  // Common function to process text (from Camera OR File)
   const processScannedText = (decodedText) => {
     try {
       const parsed = JSON.parse(decodedText);
@@ -93,11 +102,9 @@ export default function StudentMark() {
     }
   };
 
-  // Handle File Upload (Screenshot)
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     try {
       setError("");
       const html5QrCode = new Html5Qrcode("reader-file-hidden");
@@ -117,8 +124,8 @@ export default function StudentMark() {
       const isAuthenticated = await authenticateBiometric();
       if (!isAuthenticated) throw new Error("Biometric authentication cancelled by user.");
       
-      const dev = getStoredDevice(); // Ye login ke time bind ho chuka hoga
-      if (!dev) throw new Error("Device not found. Please login again.");
+      const dev = getStoredDevice();
+      if (!dev) throw new Error("Device not found. Please logout and login again.");
       
       const challenge = `${scannedData.sessionId}:${scannedData.window}:${scannedData.qrToken}`;
       
@@ -138,7 +145,7 @@ export default function StudentMark() {
       setStep(5); 
     } catch (err) {
       if (err.response?.status === 401) {
-        alert("Session expired. Please login again.");
+        alert("Session expired or invalid. Please login again.");
         navigate("/login");
         return;
       }
@@ -154,6 +161,19 @@ export default function StudentMark() {
   return (
     <div className="scan-dashboard pb-20">
       <div id="reader-file-hidden" style={{ display: "none" }}></div>
+
+      {/* 🔥 DEVICE STATUS TAG */}
+      <div className="text-center mb-4">
+        {deviceId ? (
+          <span className="badge bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-bold shadow-sm">
+            🔒 Device Bound: {deviceId.slice(0, 8)}...
+          </span>
+        ) : (
+          <span className="badge bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-bold shadow-sm">
+            ⚠️ Device Not Bound! Please Login Again
+          </span>
+        )}
+      </div>
 
       <div className="modern-stepper">
         {STEPS.map((s, i) => {
@@ -195,13 +215,7 @@ export default function StudentMark() {
                   
                   <div className="w-full text-center">
                     <p className="text-sm text-gray-400 mb-2">OR</p>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      ref={fileInputRef} 
-                      onChange={handleFileUpload} 
-                      style={{ display: "none" }} 
-                    />
+                    <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileUpload} style={{ display: "none" }} />
                     <button 
                       className="btn btn-secondary w-full flex items-center justify-center gap-2" 
                       onClick={() => fileInputRef.current.click()}
@@ -249,7 +263,7 @@ export default function StudentMark() {
             </div>
             <h2 className="text-2xl font-bold mb-2">Biometric Auth</h2>
             {isAuthenticating ? (
-              <p className="text-indigo-500 font-bold animate-pulse mb-6">Waiting for confirmation...</p>
+              <p className="text-indigo-500 font-bold animate-pulse mb-6">Waiting for OS Biometric...</p>
             ) : (
               <p className="text-muted mb-6">Tap below to authenticate.</p>
             )}
