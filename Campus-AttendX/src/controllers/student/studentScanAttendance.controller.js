@@ -1,55 +1,40 @@
-const studentScanAttendanceService = require("../../services/student/studentScanAttendance.service");
+const User = require("../../models/User");
 
-const scanAttendance = async (req, res, next) => {
+const bindDevice = async (req, res) => {
   try {
-    // 🔥 1. Extract Student ID properly from req.user (JWT Middleware se)
+    const { deviceId, deviceKey } = req.body;
     const studentId = req.user?.id || req.user?._id || req.user?.userId;
 
-    if (!studentId) {
-      console.log("🚨 JWT Error: req.user is missing or does not have an ID.");
-      return res.status(401).json({
-        success: false,
-        message: "Invalid student ID. Please login again."
-      });
+    if (!deviceId || !deviceKey) {
+      return res.status(400).json({ success: false, message: "Device info missing" });
     }
 
-    const {
-      sessionId,
-      window: qrWindow,
-      qrToken,
-      bleWindow,
-      bleToken,
-      bleRssi,
-      deviceId,
-      deviceProof,
-      fingerprintProof
-    } = req.body;
-
-    const result = await studentScanAttendanceService.scanAttendance({
+    // 🔥 FIX: Replaced { new: true } with { returnDocument: "after" }
+    const user = await User.findByIdAndUpdate(
       studentId,
-      sessionId,
-      window: qrWindow,
-      qrToken,
-      bleWindow,
-      bleToken,
-      bleRssi,
-      deviceId,
-      deviceProof,
-      fingerprintProof
-    });
+      {
+        $set: {
+          "deviceBinding.deviceId": deviceId,
+          "deviceBinding.deviceKey": deviceKey,
+          "deviceBinding.boundAt": new Date()
+        }
+      },
+      { returnDocument: "after" } // ✅ Naya tarika
+    );
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "Student not found" });
+    }
 
     return res.status(200).json({
       success: true,
-      message: result.message || "Attendance marked successfully.",
-      data: result
+      message: "Device bound successfully",
+      data: user.deviceBinding
     });
-  } catch (err) {
-    console.error("Scan Attendance Controller Error:", err.message);
-    return res.status(err.statusCode || 500).json({
-      success: false,
-      message: err.message || "Failed to mark attendance."
-    });
+  } catch (error) {
+    console.error("Bind Device Error:", error);
+    return res.status(500).json({ success: false, message: "Server error during device binding" });
   }
 };
 
-module.exports = { scanAttendance };
+module.exports = { bindDevice };
