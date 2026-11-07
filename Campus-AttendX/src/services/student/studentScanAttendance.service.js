@@ -9,18 +9,15 @@ const { validateBlePayload, BLE_MIN_RSSI, BLE_MAX_RSSI } = require("../../utils/
 const DEVICE_PROOF_PREFIX = "device:";
 const FINGERPRINT_PROOF_PREFIX = "fingerprint:";
 
-// Inline Verify Proof Function
 const verifyProof = ({ secret, prefix, challenge, proof }) => {
   if (!secret || !proof) return false;
   try {
     const expectedProof = crypto.createHmac("sha256", secret).update(prefix + challenge).digest("hex");
     const proofBuffer = Buffer.from(proof, "hex");
     const expectedBuffer = Buffer.from(expectedProof, "hex");
-
     if (proofBuffer.length !== expectedBuffer.length) return false;
     return crypto.timingSafeEqual(proofBuffer, expectedBuffer);
   } catch (err) {
-    console.error("Verify Proof Error:", err);
     return false;
   }
 };
@@ -37,16 +34,14 @@ const createError = (message, statusCode) => {
 const scanAttendance = async ({
   studentId, sessionId, window: qrWindow, qrToken, bleWindow, bleToken, bleRssi, deviceId, deviceProof, fingerprintProof
 }) => {
-  // Check ID validity
-  if (!studentId || !mongoose.isValidObjectId(studentId)) throw createError("Invalid student ID.", 400);
+  if (!mongoose.isValidObjectId(studentId)) throw createError("Invalid student ID.", 400);
   if (!mongoose.isValidObjectId(sessionId)) throw createError("Invalid attendance session ID.", 400);
 
   const validQr = validateDynamicQrPayload({ sessionId, window: qrWindow, qrToken });
-  if (!validQr) throw createError("QR code is invalid or expired. Please scan the latest QR code.", 400);
+  if (!validQr) throw createError("QR code is invalid or expired.", 400);
 
   const session = await AttendanceSession.findById(sessionId).select("+bleSecret").populate("subject");
   if (!session) throw createError("Attendance session not found.", 404);
-
   if (session.status !== "active") throw createError("This session has been closed by the teacher.", 400);
 
   const now = new Date();
@@ -64,7 +59,7 @@ const scanAttendance = async ({
 
   let bleVerified = false;
   if (bleToken && bleWindow !== undefined) {
-    if (typeof bleRssi !== "number" || bleRssi < BLE_MIN_RSSI || bleRssi > BLE_MAX_RSSI) throw createError(`BLE signal out of range (${bleRssi} dBm).`, 400);
+    if (typeof bleRssi !== "number" || bleRssi < BLE_MIN_RSSI || bleRssi > BLE_MAX_RSSI) throw createError(`BLE signal out of range.`, 400);
     const validBle = validateBlePayload({ bleSecret: session.bleSecret, window: bleWindow, token: bleToken });
     if (!validBle) throw createError("BLE proximity verification failed.", 400);
     bleVerified = true;
@@ -72,10 +67,7 @@ const scanAttendance = async ({
     throw createError("BLE proximity proof is required.", 400);
   }
 
-  // Device Binding Check
-  if (!student.deviceBinding || !student.deviceBinding.deviceId) {
-    throw createError("No device is bound to your account. Please refresh or contact admin.", 400);
-  }
+  if (!student.deviceBinding || !student.deviceBinding.deviceId) throw createError("No device is bound to your account.", 400);
   if (student.deviceBinding.deviceId !== deviceId) throw createError("This is not your bound device.", 403);
   if (!student.deviceBinding.deviceKey) throw createError("Device key is missing.", 400);
 
@@ -84,12 +76,9 @@ const scanAttendance = async ({
   const deviceVerified = verifyProof({ secret: student.deviceBinding.deviceKey, prefix: DEVICE_PROOF_PREFIX, challenge, proof: deviceProof });
   if (!deviceVerified) throw createError("Device verification failed.", 403);
 
-  // STRICT FINGERPRINT CHECK
   let fingerprintVerified = false;
-  
   if (REQUIRE_FINGERPRINT) {
     if (!fingerprintProof) throw createError("Fingerprint authentication is required.", 400);
-    
     fingerprintVerified = verifyProof({ secret: student.deviceBinding.deviceKey, prefix: FINGERPRINT_PROOF_PREFIX, challenge, proof: fingerprintProof });
     if (!fingerprintVerified) throw createError("Fingerprint authentication failed.", 403);
   } else if (fingerprintProof) {

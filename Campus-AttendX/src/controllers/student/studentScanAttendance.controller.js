@@ -1,40 +1,37 @@
-const User = require("../../models/User");
+const studentScanAttendanceService = require("../../services/student/studentScanAttendance.service");
 
-const bindDevice = async (req, res) => {
+const scanAttendance = async (req, res, next) => {
   try {
-    const { deviceId, deviceKey } = req.body;
     const studentId = req.user?.id || req.user?._id || req.user?.userId;
 
-    if (!deviceId || !deviceKey) {
-      return res.status(400).json({ success: false, message: "Device info missing" });
+    if (!studentId) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid student ID. Please login again."
+      });
     }
 
-    // 🔥 FIX: Replaced { new: true } with { returnDocument: "after" }
-    const user = await User.findByIdAndUpdate(
-      studentId,
-      {
-        $set: {
-          "deviceBinding.deviceId": deviceId,
-          "deviceBinding.deviceKey": deviceKey,
-          "deviceBinding.boundAt": new Date()
-        }
-      },
-      { returnDocument: "after" } // ✅ Naya tarika
-    );
+    const {
+      sessionId, window: qrWindow, qrToken, bleWindow, bleToken, bleRssi, deviceId, deviceProof, fingerprintProof
+    } = req.body;
 
-    if (!user) {
-      return res.status(404).json({ success: false, message: "Student not found" });
-    }
+    const result = await studentScanAttendanceService.scanAttendance({
+      studentId, sessionId, window: qrWindow, qrToken, bleWindow, bleToken, bleRssi, deviceId, deviceProof, fingerprintProof
+    });
 
     return res.status(200).json({
       success: true,
-      message: "Device bound successfully",
-      data: user.deviceBinding
+      message: result.message || "Attendance marked successfully.",
+      data: result
     });
-  } catch (error) {
-    console.error("Bind Device Error:", error);
-    return res.status(500).json({ success: false, message: "Server error during device binding" });
+  } catch (err) {
+    console.error("Scan Attendance Controller Error:", err.message);
+    return res.status(err.statusCode || 500).json({
+      success: false,
+      message: err.message || "Failed to mark attendance."
+    });
   }
 };
 
-module.exports = { bindDevice };
+// 🔥 CRITICAL EXPORT (Isko aise hi rehne dein)
+module.exports = { scanAttendance };
