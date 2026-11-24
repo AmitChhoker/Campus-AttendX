@@ -13,19 +13,22 @@ app.set('trust proxy', 1);
 // ==========================================
 // CORS SETUP
 // ==========================================
+// ==========================================
+// CORS SETUP
+// ==========================================
 app.use(cors({
-    origin: function (origin, callback) {
-        if (!origin) return callback(null, true);
-        if (origin.startsWith("http://localhost:") || origin.includes("vercel.app")) {
-            return callback(null, true);
-        }
-        console.log("Blocked by CORS:", origin);
-        callback(new Error('Not allowed by CORS'));
-    },
+    origin: [
+        "https://campus-attendx-lyart.vercel.app", // Aapka Vercel Frontend
+        "http://localhost:5173",                   // Local testing
+        "http://localhost:3000"
+    ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"]
+    allowedHeaders: ["Content-Type", "Authorization", "Origin", "Accept", "X-Requested-With"]
 }));
+
+// 🔥 Mobile preflight requests ko handle karne ke liye
+app.options('*', cors());
 
 // ==========================================
 // 🔥 CACHE DISABLE (Har baar fresh data aayega)
