@@ -6,18 +6,26 @@ const redisClient = require("../config/redis");
 const Otp = require("../models/Otp");
 const { sendSms } = require("../utils/sms");
 
-// Helper function (Ab logout aur refresh token dono mein kaam aayega)
 const getCookieOptions = (maxAge) => ({
     httpOnly: true,
-    secure: true, // Live (HTTPS) par hamesha true hona chahiye
-    sameSite: "none", // Vercel se Render cross-domain ke liye "none" zaroori hai
+    secure: true,
+    sameSite: "none",
     maxAge
 });
 
 const register = async (req, res) => {
     try {
         validUser(req.body);
-        const userData = { ...req.body };
+        
+        // 🔥 FIX: Data ko trim karke save karein
+        const userData = { 
+            ...req.body,
+            firstName: req.body.firstName?.trim(),
+            lastName: req.body.lastName?.trim(),
+            emailId: req.body.emailId?.trim().toLowerCase(),
+            phone: req.body.phone?.trim(),
+            registrationNumber: req.body.registrationNumber?.trim()
+        };
 
         if (userData.role === "student") {
             userData.batch = Number(userData.batch);
@@ -27,7 +35,7 @@ const register = async (req, res) => {
             userData.department = userData.department.toUpperCase();
         }
 
-        userData.password = await bcrypt.hash(userData.password, 10);
+        userData.password = await bcrypt.hash(userData.password.trim(), 10);
         const user = await User.create(userData);
         const { password, ...userResponse } = user.toObject();
 
@@ -49,12 +57,17 @@ const login = async (req, res) => {
     try {
         const { emailId, password } = req.body;
         
+        if (!emailId || !password) {
+            return res.status(400).json({ success: false, message: "Email and password are required" });
+        }
+
         const user = await User.findOne({ emailId: emailId.toLowerCase().trim() });
         if (!user) {
             return res.status(401).json({ success: false, message: "User not found. Please register first." });
         }
         
-        const isMatch = await bcrypt.compare(password, user.password);
+        // 🔥 FIX: Password ko bhi trim karke compare karein
+        const isMatch = await bcrypt.compare(password.trim(), user.password);
         if (!isMatch) {
             return res.status(401).json({ success: false, message: "Invalid password" });
         }
@@ -63,11 +76,10 @@ const login = async (req, res) => {
             return res.status(403).json({ success: false, message: "Account is inactive" });
         }
 
-        // Tokens Generate karein
         const accessToken = jwt.sign(
             { _id: user._id, role: user.role, adminBranch: user.adminBranch }, 
             process.env.JWT_SECRET_KEY, 
-            { expiresIn: "1d" } // Thoda time badha diya testing ke liye
+            { expiresIn: "1d" }
         );
         
         const refreshToken = jwt.sign(
@@ -76,14 +88,12 @@ const login = async (req, res) => {
             { expiresIn: "7d" }
         );
 
-        // Redis mein refresh token save karein
         await redisClient.set(`refreshToken:${user._id}`, refreshToken, { EX: 7 * 24 * 60 * 60 });
 
-        // 🔥 SIRF EK BAAR RESPONSE BHEJEIN (Purana res.cookie wala code hata dein)
         return res.status(200).json({ 
             success: true, 
             message: "Login successful",
-            token: accessToken, // Frontend isko LocalStorage mein save karega
+            token: accessToken, 
             user: {
                 _id: user._id,
                 firstName: user.firstName,
@@ -98,13 +108,14 @@ const login = async (req, res) => {
 
     } catch (err) { 
         console.error("Login Error:", err.message);
-        
-        // Agar headers pehle hi send ho chuke hain, toh dobara send mat karein
         if (!res.headersSent) {
             return res.status(500).json({ success: false, message: "Internal server error" });
         }
     }
 };
+
+// ... (Baaki logout, me, refreshToken, changePassword, sendOtp, resetPasswordWithOtp waise hi rahenge)
+
 
 const logout = async (req, res) => {
     try {

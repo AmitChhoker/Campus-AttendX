@@ -19,9 +19,10 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(emailId, password);
+      // 🔥 FIX: trim() lagaya taaki mobile ki extra space hat jaye
+      await login(emailId.trim().toLowerCase(), password.trim());
     } catch (error) {
-      alert(error.response?.data?.message || "Invalid Credentials");
+      alert(error.response?.data?.message || "Invalid Credentials or Network Error");
       setLoading(false);
     }
   };
@@ -30,7 +31,6 @@ export default function Login() {
     <div className="auth-page modern-auth-bg">
       <div className="auth-card glass-panel login-card">
         
-        {/* 🔥 LOGO & HEADER SECTION */}
         <div className="auth-header-centered mb-6">
           <div className="auth-icon-wrapper">
             <GraduationCap size={32} />
@@ -51,6 +51,9 @@ export default function Login() {
                 onChange={(e) => setEmailId(e.target.value)} 
                 placeholder="you@svsu.ac.in" 
                 className="text-gray-800 font-medium"
+                autoCapitalize="none" // 🔥 Mobile capitalization band
+                autoCorrect="off"     // 🔥 Mobile autocorrect band
+                spellCheck="false"
               />
             </div>
           </label>
@@ -66,6 +69,7 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)} 
                 placeholder="••••••••" 
                 className="text-gray-800 font-medium"
+                autoCapitalize="none"
               />
               <button 
                 type="button" 
@@ -78,7 +82,7 @@ export default function Login() {
           </label>
           
           <button type="submit" className="btn btn-primary full big mt-2 shadow-lg hover:scale-[1.02] transition-transform" disabled={loading}>
-            {loading ? "Signing in…" : "Sign In"}
+            {loading ? "Signing in… (Wait 50s if server sleeping)" : "Sign In"}
           </button>
         </form>
         

@@ -11,25 +11,27 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
 
   const [form, setForm] = useState({
-    firstName: "",
-    lastName: "",
-    emailId: "",
-    password: "",
-    phone: "",
-    registrationNumber: "",
-    department: "SFET",
-    course: "B.TECH",
-    branch: "CE",
-    batch: 2021,
-    semester: 1,
-    role: "student"
+    firstName: "", lastName: "", emailId: "", password: "", phone: "",
+    registrationNumber: "", department: "SFET", course: "B.TECH", branch: "CE",
+    batch: 2021, semester: 1, role: "student"
   });
 
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await client.post("/auth/register", form);
+      // 🔥 FIX: Saare text fields ko trim karke bhejein
+      const cleanForm = {
+        ...form,
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        emailId: form.emailId.trim().toLowerCase(),
+        password: form.password.trim(),
+        phone: form.phone.trim(),
+        registrationNumber: form.registrationNumber.trim()
+      };
+
+      await client.post("/auth/register", cleanForm);
       success("Registration successful! Please login.");
       navigate("/login");
     } catch (err) {
@@ -47,7 +49,6 @@ export default function Register() {
     <div className="auth-page modern-auth-bg">
       <div className="auth-card glass-panel register-card">
         
-        {/* 🔥 LOGO & HEADER SECTION */}
         <div className="auth-header-centered mb-6">
           <div className="auth-icon-wrapper">
             <GraduationCap size={32} />
@@ -76,7 +77,11 @@ export default function Register() {
             <span>College Email</span>
             <div className="input-wrap bg-gray-50">
               <Mail size={16} className="text-gray-400" />
-              <input required type="email" name="emailId" value={form.emailId} onChange={handleChange} placeholder="rahul@svsu.ac.in" />
+              <input 
+                required type="email" name="emailId" value={form.emailId} onChange={handleChange} 
+                placeholder="rahul@svsu.ac.in" 
+                autoCapitalize="none" autoCorrect="off" spellCheck="false" // 🔥 Mobile fix
+              />
             </div>
           </label>
 
@@ -108,7 +113,7 @@ export default function Register() {
 
           <label className="field">
             <span>Roll Number</span>
-            <input required name="registrationNumber" value={form.registrationNumber} onChange={handleChange} placeholder="CS21B001" className="bg-gray-50" />
+            <input required name="registrationNumber" value={form.registrationNumber} onChange={handleChange} placeholder="CS21B001" className="bg-gray-50" autoCapitalize="none" />
           </label>
 
           <label className="field">
@@ -147,7 +152,7 @@ export default function Register() {
 
           <div className="span-2 mt-4">
             <button className="btn btn-primary full big shadow-lg hover:scale-[1.02] transition-transform" disabled={loading}>
-              {loading ? "Creating Account..." : "Create Account"}
+              {loading ? "Creating Account... (Wait 50s if server sleeping)" : "Create Account"}
             </button>
           </div>
         </form>
