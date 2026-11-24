@@ -11,10 +11,7 @@ const app = express();
 app.set('trust proxy', 1); 
 
 // ==========================================
-// CORS SETUP
-// ==========================================
-// ==========================================
-// CORS SETUP
+// CORS SETUP (Mobile & Vercel Fixed)
 // ==========================================
 app.use(cors({
     origin: [
@@ -27,8 +24,8 @@ app.use(cors({
     allowedHeaders: ["Content-Type", "Authorization", "Origin", "Accept", "X-Requested-With"]
 }));
 
-// 🔥 Mobile preflight requests ko handle karne ke liye
-app.options('*', cors());
+// 🔥 NOTE: app.options('*', cors()) wali line hata di gayi hai kyunki Express 5 usko support nahi karta.
+// Upar wala app.use(cors(...)) automatically saari OPTIONS requests handle kar lega.
 
 // ==========================================
 // 🔥 CACHE DISABLE (Har baar fresh data aayega)
